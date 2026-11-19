@@ -36,6 +36,18 @@ test.describe('Navegação pelo teclado', () => {
     await expect(botaoAbrir).toBeFocused()
   })
 
+  test('abrir um tópico da Ajuda fecha o tópico anterior', async ({ page }) => {
+    await page.goto('/#ajuda')
+    const digitar = page.locator('details').filter({ hasText: 'Digitar sempre funciona' })
+    const internet = page.locator('details').filter({ hasText: 'Internet' }).filter({ has: page.locator('summary', { hasText: /^Internet$/ }) })
+    await expect(digitar).toHaveAttribute('open', '')
+    const titulo = internet.locator('summary')
+    await titulo.focus()
+    await titulo.press('Enter')
+    await expect(internet).toHaveAttribute('open', '')
+    await expect(digitar).not.toHaveAttribute('open', '')
+  })
+
   test('todo elemento focado mostra o contorno de foco', async ({ page }) => {
     await page.goto('/')
     for (let i = 0; i < 8; i++) {

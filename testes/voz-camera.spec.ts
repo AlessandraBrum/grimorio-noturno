@@ -79,7 +79,9 @@ test.describe('Escanear com a câmera', () => {
       if (request.url().endsWith('.traineddata.gz')) modelos.push(new URL(request.url()).pathname)
     })
     await page.goto('/#camera')
-    await expect(page.getByRole('heading', { level: 1, name: 'Midnight Owl' })).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('heading', { name: 'É esta carta?' })).toBeFocused({ timeout: 15_000 })
+    await page.getByRole('button', { name: 'Sim, abrir' }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Midnight Owl' })).toBeVisible()
     expect(modelos).toEqual(['/leitor/por.traineddata.gz'])
   })
 
@@ -92,11 +94,14 @@ test.describe('Escanear com a câmera', () => {
     await conferirAcessibilidade(page)
   })
 
-  test('nome lido com clareza abre a carta e permite escanear outra', async ({ page }) => {
+  test('nome lido com clareza pede confirmação e permite escanear outra', async ({ page }) => {
     await semCamera(page)
     await simularLeitorDeTexto(page, 'Midnight Owl  {2}{W}\nCreature — Bird\n')
     await page.goto('/#camera')
     await page.locator('input[type="file"]').setInputFiles(FOTO_DA_CARTA)
+    await expect(page.getByRole('heading', { name: 'É esta carta?' })).toBeFocused()
+    await expect(page.getByRole('heading', { level: 1, name: 'Midnight Owl' })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Sim, abrir' }).click()
     await expect(page.getByRole('heading', { level: 1, name: 'Midnight Owl' })).toBeVisible()
 
     const escanearOutra = page.getByRole('link', { name: 'Escanear outra carta' })
@@ -154,6 +159,8 @@ test.describe('Escanear com a câmera', () => {
     }))
     await page.goto('/#camera')
     await page.locator('input[type="file"]').setInputFiles(FOTO_DA_CARTA)
+    await expect(page.getByRole('heading', { name: 'É esta carta?' })).toBeFocused()
+    await page.getByRole('button', { name: 'Sim, abrir' }).click()
     await expect(page.getByRole('heading', { level: 1, name: /Liliana, Heretical Healer/ })).toBeVisible()
   })
 

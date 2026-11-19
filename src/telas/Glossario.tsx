@@ -3,8 +3,8 @@ import { FimDeSecao } from '../components/SetaTopo'
 import { usePreferencias } from '../contexto/usePreferencias'
 import { GLOSSARIO } from '../data/glossario'
 
-function semAcento(texto: string) {
-  return texto.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
+function normalizarBusca(texto: string) {
+  return texto.normalize('NFD').replace(/[\p{Diacritic}\s-]/gu, '').toLowerCase()
 }
 
 export function Glossario() {
@@ -12,9 +12,9 @@ export function Glossario() {
   const idioma = preferencias.idioma
   const [filtro, setFiltro] = useState('')
 
-  const procurado = semAcento(filtro.trim())
+  const procurado = normalizarBusca(filtro.trim())
   const termos = GLOSSARIO.filter(
-    (termo) => !procurado || semAcento(termo.nome[idioma]).includes(procurado) || semAcento(termo.original).includes(procurado),
+    (termo) => !procurado || Object.values(termo.nome).some((nome) => normalizarBusca(nome).includes(procurado)),
   ).sort((a, b) => a.nome[idioma].localeCompare(b.nome[idioma], idioma))
 
   return (
@@ -24,6 +24,7 @@ export function Glossario() {
           {t.glossario.titulo}
         </h1>
         <p className="texto-apoio">{t.glossario.apoio}</p>
+        <a href="https://magic.wizards.com/en/rules">{t.glossario.regrasOficiais}</a>
       </div>
 
       <div className="campo">

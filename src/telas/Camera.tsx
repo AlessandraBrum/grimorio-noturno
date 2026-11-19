@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { lerLinhas, prepararImagem, prepararLeitor } from '../api/ocr'
-import { buscarCarta, identificarCandidatos, SemConexao } from '../api/scryfall'
+import { identificarCandidatos, SemConexao } from '../api/scryfall'
 import { ConfirmarCarta } from '../components/ConfirmarCarta'
 import { Icone } from '../components/Icone'
 import { usePreferencias } from '../contexto/usePreferencias'
@@ -27,7 +27,6 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const fotoRef = useRef<HTMLInputElement>(null)
   const fluxoRef = useRef<MediaStream | null>(null)
-  const abrirRef = useRef(aoAbrir)
   const sessaoRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
@@ -35,10 +34,6 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
     sessaoRef.current = sessao
     return () => sessao.abort()
   }, [])
-
-  useEffect(() => {
-    abrirRef.current = aoAbrir
-  })
 
   useEffect(() => {
     prepararLeitor(preferencias.idioma).catch(() => {})
@@ -108,16 +103,10 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
           )
           if (!ativo) return
           if (linhas.length > 0) {
-            const { nomes, certeza } = await identificarCandidatos(linhas.map((linha) => linha.texto), preferencias.idioma, 'camera')
+            const { nomes } = await identificarCandidatos(linhas.map((linha) => linha.texto), preferencias.idioma, 'camera')
             if (!ativo) return
-            if (certeza) {
-              vibrar()
-              setMensagem(t.camera.encontrada(nomes[0]))
-              const carta = await buscarCarta(nomes[0], preferencias.idioma)
-              if (ativo) abrirRef.current(carta)
-              return
-            }
             if (nomes.length > 0) {
+              vibrar()
               setCandidatos(nomes)
               setEstado('confirmar')
               return
@@ -157,13 +146,8 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
         if (!sessao?.aborted && porcentagem < 100) setMensagem(t.camera.baixando(porcentagem))
       }, true)
       if (sessao?.aborted) return
-      const { nomes, certeza } = await identificarCandidatos(linhas.map((linha) => linha.texto), preferencias.idioma, 'camera')
+      const { nomes } = await identificarCandidatos(linhas.map((linha) => linha.texto), preferencias.idioma, 'camera')
       if (sessao?.aborted) return
-      if (certeza) {
-        const carta = await buscarCarta(nomes[0], preferencias.idioma)
-        if (!sessao?.aborted) aoAbrir(carta)
-        return
-      }
       if (nomes.length > 0) {
         setCandidatos(nomes)
         setEstado('confirmar')

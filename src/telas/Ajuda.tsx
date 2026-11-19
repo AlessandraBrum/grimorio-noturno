@@ -16,7 +16,7 @@ export function Ajuda() {
 
       <div className="sanfona">
         {t.ajuda.itens.map(([titulo, texto], indice) => (
-          <details key={titulo} open={indice === 0}>
+          <details name="topicos-da-ajuda" key={titulo} open={indice === 0}>
             <summary>
               <h2 className="titulo-secao">{titulo}</h2>
               <Icone nome="baixo" tamanho={20} className="sanfona__seta" />

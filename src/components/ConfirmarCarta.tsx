@@ -32,9 +32,8 @@ export function ConfirmarCarta({ candidatos, aoAbrir, aoRecomecar }: Props) {
   }, [escolhido, preferencias.idioma])
 
   useEffect(() => {
-    if (!carta) return
     tituloRef.current?.focus()
-  }, [carta])
+  }, [escolhido])
 
   const outros = candidatos.filter((nome) => nome !== escolhido)
   const nome = carta ? carta.printedName ?? carta.name : escolhido
@@ -72,7 +71,11 @@ export function ConfirmarCarta({ candidatos, aoAbrir, aoRecomecar }: Props) {
           <ul className="lista-chips">
             {outros.map((outro) => (
               <li key={outro}>
-                <button type="button" className="chip" lang="en" onClick={() => setEscolhido(outro)}>
+                <button type="button" className="chip" lang="en" onClick={() => {
+                  setCarta(null)
+                  setFalhou(false)
+                  setEscolhido(outro)
+                }}>
                   {outro}
                 </button>
               </li>

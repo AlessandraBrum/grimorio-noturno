@@ -1,6 +1,22 @@
 import { conferirAcessibilidade } from './apoio/acessibilidade'
 import { expect, test } from './apoio/scryfall-falso'
 
+test('Glossário encontra termos em português e inglês', async ({ page }) => {
+  await page.goto('/#glossario')
+  const busca = page.getByRole('searchbox', { name: 'Procurar palavra' })
+  for (const [consulta, nome] of [
+    ['connive', 'Acobertar'],
+    ['extorquir', 'Extorquir'],
+    ['swamp walk', 'Travessia de pântano'],
+    ['mill', 'Triturar'],
+    ['surveil', 'Vigiar'],
+    ['videncia', 'Vidência'],
+  ]) {
+    await busca.fill(consulta)
+    await expect(page.locator('dt').filter({ hasText: nome })).toBeVisible()
+  }
+})
+
 const TELAS = [
   { nome: 'Buscar', endereco: '/#buscar' },
   { nome: 'Glossário', endereco: '/#glossario' },
