@@ -7,7 +7,7 @@ const PROPORCAO_DA_ARTE = (ARTE.altura * 88) / (ARTE.largura * 63)
 const MENOR_ARTE = 0.3
 const MAIOR_ARTE = 0.95
 const PASSO_DE_ESCALA = 1.12
-const PASSO_DE_POSICAO = 0.1
+const PASSO_DE_POSICAO = 0.12
 
 interface Base {
   nomes: string[]
@@ -63,25 +63,76 @@ export function carregarBase() {
   return base
 }
 
-function procurar(dados: Base, consulta: Uint32Array, melhores: Map<number, number>) {
-  const vistos = new Set<number>()
+interface Busca {
+  dados: Base
+  consulta: Uint32Array
+  carimbo: Uint32Array
+  rodada: number
+  melhorPorNome: Uint8Array
+  tocados: number[]
+}
+
+const buscas = new WeakMap<Base, Busca>()
+
+function prepararBusca(dados: Base) {
+  let busca = buscas.get(dados)
+  if (!busca) {
+    busca = {
+      dados,
+      consulta: new Uint32Array(PALAVRAS_POR_IMPRESSAO),
+      carimbo: new Uint32Array(dados.indices.length),
+      rodada: 0,
+      melhorPorNome: new Uint8Array(dados.nomes.length).fill(255),
+      tocados: [],
+    }
+    buscas.set(dados, busca)
+  }
+  for (const nome of busca.tocados) busca.melhorPorNome[nome] = 255
+  busca.tocados.length = 0
+  return busca
+}
+
+function procurar(busca: Busca) {
+  const { dados, consulta, carimbo, melhorPorNome } = busca
+  busca.rodada++
+  if (busca.rodada === 0xffffffff) {
+    carimbo.fill(0)
+    busca.rodada = 1
+  }
+  const rodada = busca.rodada
+  let melhorDaJanela = 255
   for (let k = 0; k < PEDACOS; k++) {
     const valor = pedaco(consulta, 0, k)
+    const inicios = dados.inicios[k]
+    const entradas = dados.entradas[k]
     for (let bit = -1; bit < 16; bit++) {
       const vizinho = bit < 0 ? valor : valor ^ (1 << bit)
-      const fim = dados.inicios[k][vizinho + 1]
-      for (let p = dados.inicios[k][vizinho]; p < fim; p++) {
-        const entrada = dados.entradas[k][p]
-        if (vistos.has(entrada)) continue
-        vistos.add(entrada)
+      const fim = inicios[vizinho + 1]
+      for (let p = inicios[vizinho]; p < fim; p++) {
+        const entrada = entradas[p]
+        if (carimbo[entrada] === rodada) continue
+        carimbo[entrada] = rodada
         const d = distancia(consulta, 0, dados.impressoes, entrada * PALAVRAS_POR_IMPRESSAO)
+        if (d < melhorDaJanela) melhorDaJanela = d
         const nome = dados.indices[entrada]
-        const anterior = melhores.get(nome)
-        if (anterior === undefined || d < anterior) melhores.set(nome, d)
+        if (d < melhorPorNome[nome]) {
+          if (melhorPorNome[nome] === 255) busca.tocados.push(nome)
+          melhorPorNome[nome] = d
+        }
       }
     }
   }
+  return melhorDaJanela
 }
+
+interface Janela {
+  x: number
+  y: number
+  largura: number
+  distancia: number
+}
+
+const JANELAS_PARA_REFINAR = 6
 
 export async function reconhecerImagem(origem: CanvasImageSource, largura: number, altura: number): Promise<Reconhecimento | null> {
   const dados = await carregarBase()
@@ -96,8 +147,15 @@ export async function reconhecerImagem(origem: CanvasImageSource, largura: numbe
   contexto.drawImage(origem, 0, 0, w, h)
   const soma = imagemIntegral(tonsDeCinza(contexto.getImageData(0, 0, w, h).data, w, h), w, h)
 
-  const melhores = new Map<number, number>()
-  const consulta = new Uint32Array(PALAVRAS_POR_IMPRESSAO)
+  const busca = prepararBusca(dados)
+  const melhoresJanelas: Janela[] = []
+  const avaliar = (x: number, y: number, larguraDaArte: number) => {
+    const alturaDaArte = larguraDaArte * PROPORCAO_DA_ARTE
+    if (x < 0 || y < 0 || x + larguraDaArte > w || y + alturaDaArte > h) return 255
+    calcularImpressao(soma, w, x, y, larguraDaArte, alturaDaArte, busca.consulta)
+    return procurar(busca)
+  }
+
   const menorLado = Math.min(w, h)
   const maiorArte = Math.min(w, h / PROPORCAO_DA_ARTE) * MAIOR_ARTE
   for (let larguraDaArte = menorLado * MENOR_ARTE; larguraDaArte <= maiorArte; larguraDaArte *= PASSO_DE_ESCALA) {
@@ -105,16 +163,33 @@ export async function reconhecerImagem(origem: CanvasImageSource, largura: numbe
     const passo = Math.max(2, larguraDaArte * PASSO_DE_POSICAO)
     for (let y = 0; y + alturaDaArte <= h; y += passo) {
       for (let x = 0; x + larguraDaArte <= w; x += passo) {
-        calcularImpressao(soma, w, x, y, larguraDaArte, alturaDaArte, consulta)
-        procurar(dados, consulta, melhores)
+        const d = avaliar(x, y, larguraDaArte)
+        if (melhoresJanelas.length < JANELAS_PARA_REFINAR || d < melhoresJanelas[melhoresJanelas.length - 1].distancia) {
+          melhoresJanelas.push({ x, y, largura: larguraDaArte, distancia: d })
+          melhoresJanelas.sort((a, b) => a.distancia - b.distancia)
+          if (melhoresJanelas.length > JANELAS_PARA_REFINAR) melhoresJanelas.pop()
+        }
+      }
+    }
+  }
+
+  for (const janela of melhoresJanelas) {
+    const passo = janela.largura * PASSO_DE_POSICAO
+    for (const fator of [0.95, 1, 1.05]) {
+      const larguraDaArte = janela.largura * fator
+      for (let dy = -passo; dy <= passo; dy += passo / 3) {
+        for (let dx = -passo; dx <= passo; dx += passo / 3) {
+          avaliar(janela.x + dx, janela.y + dy, larguraDaArte)
+        }
       }
     }
   }
 
   let melhorNome = -1
-  let melhor = Infinity
-  let segundo = Infinity
-  for (const [nome, d] of melhores) {
+  let melhor = 255
+  let segundo = 255
+  for (const nome of busca.tocados) {
+    const d = busca.melhorPorNome[nome]
     if (d < melhor) {
       segundo = melhor
       melhor = d
