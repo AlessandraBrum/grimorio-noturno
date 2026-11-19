@@ -6,7 +6,7 @@ const PORTFOLIO = 'https://alessandrabrum.com/'
 const LUNA_SOFTWARES = ''
 
 const LINKS_DA_AUTORA = [
-  { chave: 'portfolio', href: PORTFOLIO },
+  { chave: 'portfolio', href: 'https://links.alessandrabrum.com/' },
   { chave: 'linkedin', href: 'https://linkedin.com/in/AlessandraBrum' },
   { chave: 'github', href: 'https://github.com/AlessandraBrum' },
   { chave: 'lunaSite', href: LUNA_SOFTWARES },

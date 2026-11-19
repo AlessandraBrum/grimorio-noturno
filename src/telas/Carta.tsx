@@ -3,6 +3,7 @@ import { PlayerDeVoz } from '../components/PlayerDeVoz'
 import { FimDeSecao } from '../components/SetaTopo'
 import { usePreferencias } from '../contexto/usePreferencias'
 import { termosDaCarta } from '../data/glossario'
+import { TEXTOS } from '../i18n/textos'
 import type { Card } from '../types/card'
 import { custoEmPalavras } from '../utils/custoDeMana'
 
@@ -12,7 +13,8 @@ export function Carta({ carta }: { carta: Card }) {
   const emPortugues = carta.lang === 'pt'
   const nome = carta.printedName ?? carta.name
   const tipo = carta.printedTypeLine ?? carta.typeLine
-  const texto = (emPortugues ? carta.printedText : carta.oracleText) || t.carta.semTexto
+  const textosDaCarta = TEXTOS[carta.lang].carta
+  const texto = (emPortugues ? carta.printedText : carta.oracleText) || textosDaCarta.semTexto
   const custo = custoEmPalavras(carta.manaCost, idioma)
   const temForca = carta.power !== undefined && carta.toughness !== undefined
   const termos = termosDaCarta(carta.keywords)
@@ -22,9 +24,9 @@ export function Carta({ carta }: { carta: Card }) {
   const textoParaLer = [
     nome,
     tipo,
-    `${t.carta.custo}: ${custo}`,
+    `${textosDaCarta.custo}: ${custoEmPalavras(carta.manaCost, carta.lang)}`,
     texto,
-    temForca ? t.carta.forca(carta.power!, carta.toughness!) : '',
+    temForca ? textosDaCarta.forca(carta.power!, carta.toughness!) : '',
   ]
     .filter(Boolean)
     .join('. ')
@@ -112,7 +114,10 @@ export function Carta({ carta }: { carta: Card }) {
               {temForca && (
                 <div className="ficha__linha">
                   <dt className="ficha__termo">{t.carta.forcaRotulo}</dt>
-                  <dd className="ficha__valor">{t.carta.forca(carta.power!, carta.toughness!)}</dd>
+                  <dd className="ficha__valor">
+                    <span aria-hidden="true">{carta.power}/{carta.toughness}</span>
+                    <span className="visualmente-oculto">{t.carta.forca(carta.power!, carta.toughness!)}</span>
+                  </dd>
                 </div>
               )}
               <div className="ficha__linha">

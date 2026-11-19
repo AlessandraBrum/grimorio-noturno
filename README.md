@@ -59,9 +59,9 @@ Para respeitar as regras do Scryfall, o app espera pelo menos 100 ms entre um pe
 
 ### Câmera com Tesseract (versão 3)
 
-Na versão 3, a pessoa vai poder apontar a câmera para a carta. O app tira a foto, recorta a faixa do nome e usa o Tesseract.js para ler o texto da imagem. Isso se chama OCR (reconhecimento óptico de caracteres). A leitura acontece no próprio aparelho, então a foto não é enviada para nenhum servidor.
+Ao abrir a câmera, o Grimório prepara apenas o modelo do idioma selecionado (português ou inglês). A leitura com Tesseract.js usa o quadro inteiro, com uma imagem menor na maioria das tentativas. Periodicamente, tenta de novo com mais resolução e correção de inclinação. O reconhecimento acontece no aparelho, e o aplicativo envia ao Scryfall apenas os nomes candidatos.
 
-Como o OCR pode errar com carta foil, reflexo ou pouca luz, o app faz uma busca aproximada no Scryfall e sempre pergunta: "É esta carta?".
+Na busca escrita, digite o nome exato ou escolha uma das sugestões. Na câmera, quando o nome corresponde com confiança, a ficha abre automaticamente. Leituras duvidosas podem gerar sugestões. Se o Scryfall não tiver o texto completo em português, a ficha avisa e usa o conteúdo em inglês.
 
 Antes disso, a versão 2 vai permitir falar o nome da carta, usando o reconhecimento de voz do navegador.
 

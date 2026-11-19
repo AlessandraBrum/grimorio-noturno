@@ -45,6 +45,43 @@ test.describe('Escanear com a câmera', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Escanear carta' })).toBeVisible()
   })
 
+  test('o OCR real reconhece uma carta fora do centro após quadros borrados', async ({ page }) => {
+    await page.addInitScript(() => {
+      const getUserMedia = async () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = 1600
+        canvas.height = 900
+        const contexto = canvas.getContext('2d')!
+        const inicio = performance.now()
+        const desenhar = () => {
+          const tempo = performance.now() - inicio
+          contexto.fillStyle = '#444'
+          contexto.fillRect(0, 0, 1600, 900)
+          contexto.save()
+          contexto.translate(85 + Math.sin(tempo / 60) * 16, 160)
+          contexto.filter = tempo < 800 ? 'blur(12px)' : 'none'
+          contexto.fillStyle = 'white'
+          contexto.fillRect(0, 0, 470, 650)
+          contexto.fillStyle = 'black'
+          contexto.font = 'bold 48px Arial'
+          contexto.fillText('Midnight Owl', 20, 60)
+          contexto.restore()
+          requestAnimationFrame(desenhar)
+        }
+        desenhar()
+        return canvas.captureStream(24)
+      }
+      Object.defineProperty(navigator, 'mediaDevices', { value: { getUserMedia } })
+    })
+    const modelos: string[] = []
+    page.on('request', (request) => {
+      if (request.url().endsWith('.traineddata.gz')) modelos.push(new URL(request.url()).pathname)
+    })
+    await page.goto('/#camera')
+    await expect(page.getByRole('heading', { level: 1, name: 'Midnight Owl' })).toBeVisible({ timeout: 15_000 })
+    expect(modelos).toEqual(['/leitor/por.traineddata.gz'])
+  })
+
   test('sem câmera, oferece foto e digitar', async ({ page }) => {
     await semCamera(page)
     await page.goto('/#camera')
@@ -103,26 +140,17 @@ async function abrirCarta(page: import('@playwright/test').Page) {
   await expect(page.getByRole('heading', { level: 1, name: 'Midnight Owl' })).toBeVisible()
 }
 
-const AVISO = 'use fone de ouvido ou deixe o aparelho no mudo'
-
 test.describe('Leitura em voz alta', () => {
-  test('o aviso de fone aparece e é falado só na primeira leitura', async ({ page }) => {
+  test('lê a carta em inglês e separa poder de resistência quando não houver tradução', async ({ page }) => {
     await gravarFalas(page)
     await page.goto('/')
     await abrirCarta(page)
     await page.getByRole('button', { name: 'Ler em voz alta' }).click()
-    await expect(page.getByText(AVISO)).toBeVisible()
-    const primeiras = await falasGravadas(page)
-    expect(primeiras[0]).toContain('fone de ouvido')
-    expect(primeiras).toHaveLength(2)
-
-    await page.reload()
-    await abrirCarta(page)
-    await page.getByRole('button', { name: 'Ler em voz alta' }).click()
-    await expect(page.getByText(AVISO)).toBeHidden()
-    const depois = await falasGravadas(page)
-    expect(depois).toHaveLength(1)
-    expect(depois[0]).not.toContain('fone de ouvido')
+    const falas = await falasGravadas(page)
+    expect(falas).toHaveLength(1)
+    expect(falas[0]).toContain('2 power and 2 toughness')
+    expect(falas[0]).not.toContain('2/2')
+    expect(falas[0]).toContain('Mana cost')
   })
 
   test('mudo por padrão: nenhuma carta é lida sozinha', async ({ page }) => {
@@ -139,12 +167,13 @@ test.describe('Leitura em voz alta', () => {
     const som = page.getByRole('button', { name: 'Ler toda carta sozinho' })
     await som.click()
     await expect(som).toHaveAttribute('aria-pressed', 'true')
-    await expect.poll(async () => (await falasGravadas(page)).length).toBeGreaterThan(0)
+    await expect.poll(async () => (await falasGravadas(page)).length).toBe(1)
+    const depoisDeLigar = (await falasGravadas(page)).length
 
     await page.goto('/#buscar')
     await abrirCarta(page)
+    await expect.poll(async () => (await falasGravadas(page)).length).toBe(depoisDeLigar + 1)
     const antesDeMutar = (await falasGravadas(page)).length
-    expect(antesDeMutar).toBeGreaterThanOrEqual(3)
 
     await page.getByRole('button', { name: 'Ler toda carta sozinho' }).click()
     await page.goto('/#buscar')

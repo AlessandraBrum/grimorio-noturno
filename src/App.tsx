@@ -14,12 +14,13 @@ import { Carta } from './telas/Carta'
 import { Glossario } from './telas/Glossario'
 import { Leitura } from './telas/Leitura'
 import { Sobre } from './telas/Sobre'
-import type { Card } from './types/card'
+import type { Card, Idioma } from './types/card'
 
 export function App() {
   const { t, preferencias, lembrar } = usePreferencias()
   const { tela, irPara } = useTela()
-  const [carta, setCarta] = useState<Card | null>(null)
+  const [cartaAberta, setCartaAberta] = useState<{ carta: Card; idioma: Idioma } | null>(null)
+  const carta = cartaAberta?.carta
   const [estadoBusca, setEstadoBusca] = useState<EstadoBusca>('parado')
   const [ajustesAbertos, setAjustesAbertos] = useState(false)
   const botaoAjustesRef = useRef<HTMLButtonElement>(null)
@@ -38,6 +39,16 @@ export function App() {
     document.getElementById('titulo-tela')?.focus()
   }, [telaVisivel, carta, t])
 
+  useEffect(() => {
+    const idioma = preferencias.idioma
+    if (telaVisivel !== 'carta' || !cartaAberta || cartaAberta.idioma === idioma) return
+    let ativo = true
+    buscarCarta(cartaAberta.carta.name, idioma).then((localizada) => {
+      if (ativo) setCartaAberta({ carta: localizada, idioma })
+    }).catch(() => {})
+    return () => { ativo = false }
+  }, [cartaAberta, preferencias.idioma, telaVisivel])
+
   async function abrirPorNome(nome: string) {
     setEstadoBusca('carregando')
     try {
@@ -52,7 +63,7 @@ export function App() {
   }
 
   function abrirCarta(escolhida: Card) {
-    setCarta(escolhida)
+    setCartaAberta({ carta: escolhida, idioma: preferencias.idioma })
     lembrar(escolhida)
     irPara('carta')
   }
@@ -88,12 +99,12 @@ export function App() {
           {telaVisivel === 'buscar' && (
             <Buscar estado={estadoBusca} aoBuscar={abrirPorNome} aoAbrirRecente={abrirCarta} />
           )}
-          {telaVisivel === 'carta' && carta && <Carta carta={carta} />}
+          {telaVisivel === 'carta' && carta && <Carta key={carta.id + carta.lang} carta={carta} />}
           {telaVisivel === 'glossario' && <Glossario />}
           {telaVisivel === 'leitura' && <Leitura />}
           {telaVisivel === 'ajuda' && <Ajuda />}
           {telaVisivel === 'sobre' && <Sobre />}
-          {telaVisivel === 'camera' && <Camera aoAbrir={abrirCarta} />}
+          {telaVisivel === 'camera' && <Camera key={preferencias.idioma} aoAbrir={abrirCarta} />}
         </main>
         <Rodape />
         <SetaTopo key={telaVisivel} />

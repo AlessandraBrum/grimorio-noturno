@@ -42,7 +42,8 @@ export async function simularScryfall(page: Page) {
       const data = NOMES.filter((nome) => nome.toLowerCase().includes(busca))
       return rota.fulfill({ json: { object: 'catalog', data } })
     }
-    if (url.pathname === '/cards/named' && busca.includes('midnight owl')) {
+    const exato = url.searchParams.get('exact')?.toLowerCase()
+    if (url.pathname === '/cards/named' && (exato === 'midnight owl' || busca.includes('midnight owl'))) {
       return rota.fulfill({ json: CARTA_FALSA })
     }
     return rota.fulfill(NAO_ENCONTRADA)

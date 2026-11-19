@@ -19,17 +19,27 @@ export function BuscaCarta({ aoEscolher }: { aoEscolher: (nome: string) => void 
     const espera = setTimeout(() => {
       sugerirNomes(texto, controle.signal)
         .then((nomes) => {
+          if (controle.signal.aborted) return
           setSugestoes(nomes)
           setAberta(true)
           setAtiva(-1)
         })
-        .catch(() => setSugestoes([]))
+        .catch(() => {
+          if (!controle.signal.aborted) setSugestoes([])
+        })
     }, ESPERA_DIGITACAO_MS)
     return () => {
       clearTimeout(espera)
       controle.abort()
     }
   }, [texto])
+
+  function alterarTexto(valor: string) {
+    setTexto(valor)
+    setSugestoes([])
+    setAberta(false)
+    setAtiva(-1)
+  }
 
   function escolher(nome: string) {
     setTexto(nome)
@@ -47,7 +57,7 @@ export function BuscaCarta({ aoEscolher }: { aoEscolher: (nome: string) => void 
       setAtiva((atual) => Math.max(atual - 1, 0))
     } else if (evento.key === 'Enter') {
       evento.preventDefault()
-      const nome = ativa >= 0 ? sugestoes[ativa] : texto.trim()
+      const nome = mostrarLista && ativa >= 0 ? sugestoes[ativa] : texto.trim()
       if (nome) escolher(nome)
     } else if (evento.key === 'Escape') {
       setAberta(false)
@@ -78,7 +88,7 @@ export function BuscaCarta({ aoEscolher }: { aoEscolher: (nome: string) => void 
           aria-controls={idLista}
           aria-activedescendant={mostrarLista && ativa >= 0 ? `${id}-opcao-${ativa}` : undefined}
           value={texto}
-          onChange={(evento) => setTexto(evento.target.value)}
+          onChange={(evento) => alterarTexto(evento.target.value)}
           onKeyDown={aoTeclar}
         />
         {texto && (
@@ -87,8 +97,7 @@ export function BuscaCarta({ aoEscolher }: { aoEscolher: (nome: string) => void 
             className="botao-redondo"
             aria-label={t.buscar.limpar}
             onClick={() => {
-              setTexto('')
-              setSugestoes([])
+              alterarTexto('')
               document.getElementById('nome-da-carta')?.focus()
             }}
           >

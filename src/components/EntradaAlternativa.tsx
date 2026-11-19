@@ -42,7 +42,7 @@ export function EntradaAlternativa({ aoAbrir }: { aoAbrir: (carta: Card) => void
     setEstado('procurando')
     setMensagem(`${t.entrada.ouvi(textos[0])} ${t.entrada.procurando}.`)
     try {
-      const { nomes, certeza } = await identificarCandidatos(textos)
+      const { nomes, certeza } = await identificarCandidatos(textos, preferencias.idioma)
       if (nomes.length === 0) {
         setEstado('erro')
         setMensagem(`${t.entrada.ouvi(textos[0])} ${t.entrada.naoAchei}`)

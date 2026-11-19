@@ -22,6 +22,13 @@ test.describe('Busca de carta', () => {
     await expect(page).toHaveTitle(/Midnight Owl/)
   })
 
+  test('um nome digitado imperfeito não abre o resultado aproximado', async ({ page }) => {
+    const campo = page.getByRole('combobox', { name: 'Nome da carta' })
+    await campo.fill('Midnight Owl zzzz')
+    await campo.press('Enter')
+    await expect(page.getByText('Nenhuma carta com esse nome')).toBeVisible()
+  })
+
   test('avisa quando a carta não existe', async ({ page }) => {
     const campo = page.getByRole('combobox', { name: 'Nome da carta' })
     await campo.fill('carta que não existe')

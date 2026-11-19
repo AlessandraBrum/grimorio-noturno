@@ -29,14 +29,21 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
   const fotoRef = useRef<HTMLInputElement>(null)
   const fluxoRef = useRef<MediaStream | null>(null)
   const abrirRef = useRef(aoAbrir)
+  const sessaoRef = useRef<AbortController | null>(null)
+
+  useEffect(() => {
+    const sessao = new AbortController()
+    sessaoRef.current = sessao
+    return () => sessao.abort()
+  }, [])
 
   useEffect(() => {
     abrirRef.current = aoAbrir
   })
 
   useEffect(() => {
-    prepararLeitor().catch(() => {})
-  }, [])
+    prepararLeitor(preferencias.idioma).catch(() => {})
+  }, [preferencias.idioma])
 
   useEffect(() => {
     let ativo = true
@@ -83,25 +90,27 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
           continue
         }
         try {
-          const imagem = prepararImagem(video, video.videoWidth, video.videoHeight)
-          const linhas = await lerLinhas(imagem, (porcentagem) => {
+          const maisDetalhe = rodadas % RODADAS_ATE_A_DICA === RODADAS_ATE_A_DICA - 1
+          const imagem = prepararImagem(video, video.videoWidth, video.videoHeight, maisDetalhe ? 1920 : undefined)
+          const linhas = await lerLinhas(imagem, preferencias.idioma, (porcentagem) => {
             if (ativo && porcentagem < 100) setMensagem(t.camera.baixando(porcentagem))
-          })
+          }, maisDetalhe)
           if (!ativo) return
           if (linhas.length > 0) {
-            const { nomes, certeza } = await identificarCandidatos(linhas.map((linha) => linha.texto))
+            const { nomes, certeza } = await identificarCandidatos(linhas.map((linha) => linha.texto), preferencias.idioma)
             if (!ativo) return
             if (certeza) {
               vibrar()
               setMensagem(t.camera.encontrada(nomes[0]))
-              abrirRef.current(await buscarCarta(nomes[0], preferencias.idioma))
+              const carta = await buscarCarta(nomes[0], preferencias.idioma)
+              if (ativo) abrirRef.current(carta)
               return
             }
             if (nomes.length > 0) setSugestoes(nomes)
           }
           rodadas += 1
           setMensagem(rodadas >= RODADAS_ATE_A_DICA ? t.camera.dica : t.camera.procurandoNome)
-          await esperar(300)
+          await esperar(150)
         } catch (erro) {
           if (!ativo) return
           setMensagem(erro instanceof SemConexao ? t.buscar.semInternet : t.camera.dica)
@@ -120,17 +129,24 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
     const arquivo = evento.target.files?.[0]
     evento.target.value = ''
     if (!arquivo) return
+    const sessao = sessaoRef.current?.signal
     const anterior = estado
     setEstado('lendo-foto')
     setMensagem(t.camera.lendo)
     try {
       const bitmap = await createImageBitmap(arquivo)
-      const linhas = await lerLinhas(prepararImagem(bitmap, bitmap.width, bitmap.height), (porcentagem) => {
-        if (porcentagem < 100) setMensagem(t.camera.baixando(porcentagem))
-      })
-      const { nomes, certeza } = await identificarCandidatos(linhas.map((linha) => linha.texto))
+      const imagem = prepararImagem(bitmap, bitmap.width, bitmap.height, 1920)
+      bitmap.close()
+      if (sessao?.aborted) return
+      const linhas = await lerLinhas(imagem, preferencias.idioma, (porcentagem) => {
+        if (!sessao?.aborted && porcentagem < 100) setMensagem(t.camera.baixando(porcentagem))
+      }, true)
+      if (sessao?.aborted) return
+      const { nomes, certeza } = await identificarCandidatos(linhas.map((linha) => linha.texto), preferencias.idioma)
+      if (sessao?.aborted) return
       if (certeza) {
-        aoAbrir(await buscarCarta(nomes[0], preferencias.idioma))
+        const carta = await buscarCarta(nomes[0], preferencias.idioma)
+        if (!sessao?.aborted) aoAbrir(carta)
         return
       }
       if (nomes.length > 0) {
@@ -142,14 +158,17 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
       setEstado('erro')
       setMensagem(t.camera.naoLi)
     } catch (erro) {
+      if (sessao?.aborted) return
       setEstado(erro instanceof SemConexao ? 'erro' : anterior)
       setMensagem(erro instanceof SemConexao ? t.buscar.semInternet : t.camera.naoLi)
     }
   }
 
   async function abrirSugestao(nome: string) {
+    const sessao = sessaoRef.current?.signal
     try {
-      aoAbrir(await buscarCarta(nome, preferencias.idioma))
+      const carta = await buscarCarta(nome, preferencias.idioma)
+      if (!sessao?.aborted) aoAbrir(carta)
     } catch {
       setMensagem(t.entrada.naoAchei)
     }

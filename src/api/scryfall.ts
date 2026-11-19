@@ -100,24 +100,58 @@ export async function sugerirNomes(texto: string, sinal?: AbortSignal): Promise<
   return resultado.data.slice(0, 8)
 }
 
-export async function buscarCarta(nome: string, idioma: Idioma): Promise<Card> {
-  const original = converter(
-    await pedir<CartaScryfall>(`/cards/named?fuzzy=${encodeURIComponent(nome)}`),
-  )
-  if (idioma === 'en') return original
+const cartasPorIdioma = new Map<string, Card>()
+const cartasIdentificadas = new Map<string, CartaScryfall>()
 
-  try {
-    const consulta = encodeURIComponent(`!"${original.name}" lang:pt`)
-    const lista = await pedir<ListaScryfall<CartaScryfall>>(
-      `/cards/search?q=${consulta}&unique=prints`,
-    )
-    const emPortugues = lista.data.find((carta) => carta.printed_text || carta.printed_name)
-    if (!emPortugues) return original
-    const traduzida = converter(emPortugues)
-    return { ...traduzida, oracleText: original.oracleText, keywords: original.keywords }
-  } catch {
+export async function buscarCarta(nome: string, idioma: Idioma): Promise<Card> {
+  const chave = idioma + ':' + nome.trim().toLowerCase()
+  const guardada = cartasPorIdioma.get(chave)
+  if (guardada) return guardada
+  const dados = cartasIdentificadas.get(chave)
+    ?? (idioma === 'pt' ? await buscarNomeExato(nome, idioma) : undefined)
+    ?? await pedir<CartaScryfall>('/cards/named?exact=' + encodeURIComponent(nome.trim()))
+  const original = converter(dados)
+  if (dados.lang === idioma && (idioma === 'en' || temTextoEmPortugues(original))) {
+    cartasPorIdioma.set(chave, original)
     return original
   }
+  const emIngles: Card = {
+    ...original,
+    lang: 'en',
+    printedName: undefined,
+    printedTypeLine: undefined,
+    printedText: undefined,
+  }
+
+  try {
+    const dadosLocalizados = await buscarNomeExato(original.name, idioma)
+    const localizada = dadosLocalizados ? converter(dadosLocalizados) : undefined
+    const resultado = localizada ?? emIngles
+    cartasPorIdioma.set(chave, resultado)
+    return resultado
+  } catch {
+    return emIngles
+  }
+}
+
+async function buscarNomeExato(nome: string, idioma: Idioma): Promise<CartaScryfall | undefined> {
+  const seguro = nome.replace(/["\\]/g, '').trim()
+  if (!seguro) return undefined
+  const consulta = '!"' + seguro + '" lang:' + idioma
+  try {
+    const lista = await pedir<ListaScryfall<CartaScryfall>>(
+      '/cards/search?q=' + encodeURIComponent(consulta) + '&unique=prints',
+    )
+    return lista.data.find((carta) => carta.lang === idioma
+      && (idioma === 'en' || temTextoEmPortugues(converter(carta))))
+  } catch (erro) {
+    if (!(erro instanceof CartaNaoEncontrada)) throw erro
+    return undefined
+  }
+}
+
+function temTextoEmPortugues(carta: Card) {
+  return !!carta.printedName && !!carta.printedTypeLine && (!carta.oracleText || !!carta.printedText)
 }
 
 function normalizar(texto: string) {
@@ -157,22 +191,34 @@ interface Achado {
 
 const jaProcurados = new Map<string, Achado>()
 
-async function procurarTexto(texto: string): Promise<Achado> {
-  const chave = normalizar(texto)
+async function buscarPorTexto(texto: string, idioma: Idioma) {
+  const palavras = texto.replace(/[^\p{L}\p{N} -]/gu, ' ').trim()
+  if (!palavras) return []
+  const consulta = 'lang:' + idioma + ' ' + palavras
+  const lista = await pedir<ListaScryfall<CartaScryfall>>('/cards/search?q=' + encodeURIComponent(consulta))
+  return lista.data.filter((carta) => carta.lang === idioma)
+}
+
+async function procurarTexto(texto: string, idioma: Idioma): Promise<Achado> {
+  const chave = idioma + ':' + normalizar(texto)
   const guardado = jaProcurados.get(chave)
   if (guardado) return guardado
 
   let achado: Achado = { nomes: [], certeza: false }
   try {
-    const carta = await pedir<CartaScryfall>(`/cards/named?fuzzy=${encodeURIComponent(texto)}`)
-    achado = { nomes: [carta.name], certeza: semelhanca(texto, carta.name) >= SEMELHANCA_SEGURA }
+    const carta = (idioma === 'pt' ? await buscarNomeExato(texto, idioma) : undefined)
+      ?? await pedir<CartaScryfall>(`/cards/named?fuzzy=${encodeURIComponent(texto)}`)
+    const impresso = idioma === carta.lang ? carta.printed_name ?? carta.card_faces?.[0]?.printed_name : undefined
+    cartasIdentificadas.set(idioma + ':' + carta.name.toLowerCase(), carta)
+    const pontuacao = Math.max(semelhanca(texto, carta.name), semelhanca(texto, impresso ?? ''))
+    achado = { nomes: [carta.name], certeza: pontuacao >= SEMELHANCA_SEGURA }
   } catch (erro) {
-    if (erro instanceof SemConexao) throw erro
+    if (!(erro instanceof CartaNaoEncontrada)) throw erro
     try {
-      const lista = await pedir<ListaScryfall<CartaScryfall>>(
-        `/cards/search?q=${encodeURIComponent(texto)}&include_multilingual=true`,
-      )
-      const encontradas = lista.data.slice(0, 3)
+      const encontradas = (await buscarPorTexto(texto, idioma)).slice(0, 3)
+      for (const carta of encontradas) {
+        cartasIdentificadas.set(idioma + ':' + carta.name.toLowerCase(), carta)
+      }
       const primeira = encontradas[0]
       achado = {
         nomes: encontradas.map((carta) => carta.name),
@@ -182,14 +228,14 @@ async function procurarTexto(texto: string): Promise<Achado> {
           semelhanca(texto, primeira.printed_name ?? primeira.name) >= SEMELHANCA_SEGURA,
       }
     } catch (erroBusca) {
-      if (erroBusca instanceof SemConexao) throw erroBusca
+      if (!(erroBusca instanceof CartaNaoEncontrada)) throw erroBusca
     }
   }
   jaProcurados.set(chave, achado)
   return achado
 }
 
-export async function identificarCandidatos(textos: string[]): Promise<Identificacao> {
+export async function identificarCandidatos(textos: string[], idioma: Idioma): Promise<Identificacao> {
   const nomes: string[] = []
   const guardar = (nome: string) => {
     if (!nomes.includes(nome)) nomes.push(nome)
@@ -198,7 +244,7 @@ export async function identificarCandidatos(textos: string[]): Promise<Identific
   for (const texto of textos.slice(0, 4)) {
     const limpo = texto.trim()
     if (limpo.length < 3) continue
-    const achado = await procurarTexto(limpo)
+    const achado = await procurarTexto(limpo, idioma)
     if (achado.certeza) return { nomes: achado.nomes.slice(0, 1), certeza: true }
     achado.nomes.forEach(guardar)
   }
