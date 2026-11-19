@@ -80,6 +80,7 @@ const pt = {
     colecao: 'Coleção',
     oQueE: (nome: string) => `${nome}: o que é?`,
     ajustarLeitura: 'Ajustar letra e contraste',
+    escanearOutra: 'Escanear outra carta',
   },
   player: {
     regiao: 'Ler em voz alta',
@@ -275,6 +276,7 @@ const en: Textos = {
     colecao: 'Set',
     oQueE: (nome: string) => `${nome}: what is it?`,
     ajustarLeitura: 'Adjust text size and contrast',
+    escanearOutra: 'Scan another card',
   },
   player: {
     regiao: 'Read aloud',

@@ -91,12 +91,17 @@ test.describe('Escanear com a câmera', () => {
     await conferirAcessibilidade(page)
   })
 
-  test('nome lido com clareza abre a carta direto', async ({ page }) => {
+  test('nome lido com clareza abre a carta e permite escanear outra', async ({ page }) => {
     await semCamera(page)
     await simularLeitorDeTexto(page, 'Midnight Owl  {2}{W}\nCreature — Bird\n')
     await page.goto('/#camera')
     await page.locator('input[type="file"]').setInputFiles(FOTO_DA_CARTA)
     await expect(page.getByRole('heading', { level: 1, name: 'Midnight Owl' })).toBeVisible()
+
+    const escanearOutra = page.getByRole('link', { name: 'Escanear outra carta' })
+    await escanearOutra.focus()
+    await escanearOutra.press('Enter')
+    await expect(page.getByRole('heading', { level: 1, name: 'Escanear carta' })).toBeFocused()
   })
 
   test('leitura duvidosa pergunta antes e "Não, tentar de novo" volta para a câmera', async ({ page }) => {

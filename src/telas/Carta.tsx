@@ -130,6 +130,10 @@ export function Carta({ carta }: { carta: Card }) {
           </section>
 
           <a href="#leitura">{t.carta.ajustarLeitura}</a>
+          <a href="#camera" className="botao-principal">
+            <Icone nome="camera" tamanho={20} />
+            {t.carta.escanearOutra}
+          </a>
         </div>
       </div>
       <FimDeSecao />
