@@ -95,7 +95,7 @@ const pt = {
     lerSozinho: 'Ler toda carta sozinho',
     lerSozinhoLigado: 'Som ligado: cada carta aberta é lida em voz alta.',
     lerSozinhoDesligado: 'Mudo: nenhuma carta é lida sozinha. O botão de ler continua funcionando.',
-    avisoFone: 'Dica: use fone de ouvido ou deixe o aparelho no mudo e leia na tela, para o seu oponente não ouvir as cartas da sua mão.',
+    avisoFone: 'Dica: use fone de ouvido ou deixe o aparelho no mudo e leia na tela, para o seu oponente não ouvir as cartas da sua mão. Para ouvir cada carta ao abri-la, ative “Ler toda carta sozinho” no menu Ajustes.',
   },
   leitura: {
     titulo: 'Modo de leitura',
@@ -290,7 +290,7 @@ const en: Textos = {
     lerSozinho: 'Read every card automatically',
     lerSozinhoLigado: 'Sound on: every card you open is read aloud.',
     lerSozinhoDesligado: 'Muted: no card is read automatically. The read button still works.',
-    avisoFone: 'Tip: use headphones, or mute your device and read on screen, so your opponent does not hear the cards in your hand.',
+    avisoFone: 'Tip: use headphones, or mute your device and read on screen, so your opponent does not hear the cards in your hand. To hear each card when you open it, turn on “Read every card automatically” in Settings.',
   },
   leitura: {
     titulo: 'Reading mode',
