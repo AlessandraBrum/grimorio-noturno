@@ -45,8 +45,18 @@ test.describe('Escanear com a câmera', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Escanear carta' })).toBeVisible()
   })
 
-  test('a câmera reconhece automaticamente sem capturar nem confirmar', async ({ page }) => {
+  test('a câmera recorta o título em fundo escuro e abre a carta sem interação', async ({ page }) => {
     await page.addInitScript(() => {
+      const WorkerOriginal = window.Worker
+      const modos: string[] = []
+      Object.assign(window, { modosDeOcr: modos })
+      window.Worker = class extends WorkerOriginal {
+        postMessage(...[mensagem, opcoes]: Parameters<Worker['postMessage']>) {
+          const modo = mensagem?.payload?.options?.tessedit_pageseg_mode
+          if (mensagem?.action === 'recognize' && modo) modos.push(modo)
+          super.postMessage(mensagem, opcoes)
+        }
+      }
       const getUserMedia = async () => {
         const canvas = document.createElement('canvas')
         canvas.width = 1600
@@ -55,7 +65,7 @@ test.describe('Escanear com a câmera', () => {
         const inicio = performance.now()
         const desenhar = () => {
           const tempo = performance.now() - inicio
-          contexto.fillStyle = '#444'
+          contexto.fillStyle = '#2a2525'
           contexto.fillRect(0, 0, 1600, 900)
           contexto.save()
           contexto.translate(85 + Math.sin(tempo / 60) * 16, 160)
@@ -85,6 +95,7 @@ test.describe('Escanear com a câmera', () => {
     await expect(page.getByRole('button', { name: 'Capturar quadro e ler' })).toHaveCount(0)
     await expect(page.getByRole('heading', { level: 1, name: 'Midnight Owl' })).toBeVisible({ timeout: 15_000 })
     expect(modelos).toEqual(['/leitor/por.traineddata.gz'])
+    expect(await page.evaluate(() => Reflect.get(window, 'modosDeOcr'))).toContain('7')
   })
 
   test('usa o recorte em nuvem apenas depois de ativar a opção', async ({ page }) => {

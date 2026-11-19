@@ -80,11 +80,29 @@ function localizarCarta(imagem: HTMLCanvasElement) {
   const { width, height } = amostra
   contexto.drawImage(imagem, 0, 0, width, height)
   const pixels = contexto.getImageData(0, 0, width, height).data
-  const escuros = new Uint8Array(width * height)
-  for (let i = 0; i < escuros.length; i++) {
-    escuros[i] = pixels[i * 4] * 0.21 + pixels[i * 4 + 1] * 0.72 + pixels[i * 4 + 2] * 0.07 < 78 ? 1 : 0
+  const luminancias = new Uint8Array(width * height)
+  for (let i = 0; i < luminancias.length; i++) {
+    luminancias[i] = pixels[i * 4] * 0.21 + pixels[i * 4 + 1] * 0.72 + pixels[i * 4 + 2] * 0.07
   }
 
+  // O fundo pode ser mais escuro que o limiar usado para encontrar a moldura.
+  const margens: number[] = []
+  for (let x = 0; x < width; x += 4) {
+    margens.push(luminancias[x], luminancias[(height - 1) * width + x])
+  }
+  for (let y = 0; y < height; y += 4) {
+    margens.push(luminancias[y * width], luminancias[y * width + width - 1])
+  }
+  margens.sort((a, b) => a - b)
+  const fundo = margens[Math.floor(margens.length / 2)]
+  const limiar = Math.min(78, Math.max(8, fundo - 8))
+  const carta = localizarComLimiar(luminancias, width, height, escala, limiar)
+  if (carta || limiar === 78) return carta
+  return localizarComLimiar(luminancias, width, height, escala, 78)
+}
+
+function localizarComLimiar(luminancias: Uint8Array, width: number, height: number, escala: number, limiar: number) {
+  const escuros = luminancias.map((luz) => luz < limiar ? 1 : 0)
   const bordas = escuros.slice()
   for (let y = 1; y < height - 1; y++) {
     for (let x = 1; x < width - 1; x++) {
