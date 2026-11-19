@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { buscarCarta, CartaNaoEncontrada, SemConexao } from './api/scryfall'
 import { Cabecalho } from './components/Cabecalho'
+import { Ceu } from './components/Ceu'
 import { PainelAjustes } from './components/PainelAjustes'
 import { Rodape } from './components/Rodape'
 import { SetaTopo } from './components/SetaTopo'
@@ -8,6 +9,7 @@ import { usePreferencias } from './contexto/usePreferencias'
 import { useTela } from './navegacao'
 import { Ajuda } from './telas/Ajuda'
 import { Buscar, type EstadoBusca } from './telas/Buscar'
+import { Camera } from './telas/Camera'
 import { Carta } from './telas/Carta'
 import { Glossario } from './telas/Glossario'
 import { Leitura } from './telas/Leitura'
@@ -71,6 +73,7 @@ export function App() {
 
   return (
     <>
+      <Ceu />
       <div className="app" inert={ajustesAbertos}>
         <a className="pular-conteudo" href="#nome-da-carta" onClick={() => irPara('buscar')}>
           {t.pularParaBusca}
@@ -90,6 +93,7 @@ export function App() {
           {telaVisivel === 'leitura' && <Leitura />}
           {telaVisivel === 'ajuda' && <Ajuda />}
           {telaVisivel === 'sobre' && <Sobre />}
+          {telaVisivel === 'camera' && <Camera aoAbrir={abrirCarta} />}
         </main>
         <Rodape />
         <SetaTopo key={telaVisivel} />

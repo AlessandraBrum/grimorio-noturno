@@ -11,6 +11,7 @@ export interface Preferencias {
   idioma: Idioma
   tema: Tema
   animacoes: boolean
+  lerSozinho: boolean
   tamanho: Tamanho
   espacamento: Espacamento
   contraste: Contraste
@@ -27,6 +28,7 @@ export const PADRAO: Preferencias = {
   idioma: 'pt',
   tema: 'escuro',
   animacoes: true,
+  lerSozinho: false,
   tamanho: 'grande',
   espacamento: 'normal',
   contraste: 'padrao',

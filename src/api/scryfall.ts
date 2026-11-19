@@ -119,3 +119,98 @@ export async function buscarCarta(nome: string, idioma: Idioma): Promise<Card> {
     return original
   }
 }
+
+function normalizar(texto: string) {
+  return texto
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '')
+}
+
+function semelhanca(a: string, b: string) {
+  const x = normalizar(a)
+  const y = normalizar(b)
+  if (!x || !y) return 0
+  let anterior = Array.from({ length: y.length + 1 }, (_, indice) => indice)
+  for (let i = 1; i <= x.length; i++) {
+    const atual = [i]
+    for (let j = 1; j <= y.length; j++) {
+      atual[j] = Math.min(anterior[j] + 1, atual[j - 1] + 1, anterior[j - 1] + (x[i - 1] === y[j - 1] ? 0 : 1))
+    }
+    anterior = atual
+  }
+  return 1 - anterior[y.length] / Math.max(x.length, y.length)
+}
+
+const SEMELHANCA_SEGURA = 0.6
+
+export interface Identificacao {
+  nomes: string[]
+  certeza: boolean
+}
+
+interface Achado {
+  nomes: string[]
+  certeza: boolean
+}
+
+const jaProcurados = new Map<string, Achado>()
+
+async function procurarTexto(texto: string): Promise<Achado> {
+  const chave = normalizar(texto)
+  const guardado = jaProcurados.get(chave)
+  if (guardado) return guardado
+
+  let achado: Achado = { nomes: [], certeza: false }
+  try {
+    const carta = await pedir<CartaScryfall>(`/cards/named?fuzzy=${encodeURIComponent(texto)}`)
+    achado = { nomes: [carta.name], certeza: semelhanca(texto, carta.name) >= SEMELHANCA_SEGURA }
+  } catch (erro) {
+    if (erro instanceof SemConexao) throw erro
+    try {
+      const lista = await pedir<ListaScryfall<CartaScryfall>>(
+        `/cards/search?q=${encodeURIComponent(texto)}&include_multilingual=true`,
+      )
+      const encontradas = lista.data.slice(0, 3)
+      const primeira = encontradas[0]
+      achado = {
+        nomes: encontradas.map((carta) => carta.name),
+        certeza:
+          encontradas.length === 1 &&
+          !!primeira &&
+          semelhanca(texto, primeira.printed_name ?? primeira.name) >= SEMELHANCA_SEGURA,
+      }
+    } catch (erroBusca) {
+      if (erroBusca instanceof SemConexao) throw erroBusca
+    }
+  }
+  jaProcurados.set(chave, achado)
+  return achado
+}
+
+export async function identificarCandidatos(textos: string[]): Promise<Identificacao> {
+  const nomes: string[] = []
+  const guardar = (nome: string) => {
+    if (!nomes.includes(nome)) nomes.push(nome)
+  }
+
+  for (const texto of textos.slice(0, 4)) {
+    const limpo = texto.trim()
+    if (limpo.length < 3) continue
+    const achado = await procurarTexto(limpo)
+    if (achado.certeza) return { nomes: achado.nomes.slice(0, 1), certeza: true }
+    achado.nomes.forEach(guardar)
+  }
+
+  if (nomes.length > 0 && nomes.length < 3) {
+    try {
+      ;(await sugerirNomes(nomes[0].split(' ')[0])).forEach((nome) => {
+        if (nomes.length < 3) guardar(nome)
+      })
+    } catch {
+      return { nomes, certeza: false }
+    }
+  }
+  return { nomes: nomes.slice(0, 3), certeza: false }
+}

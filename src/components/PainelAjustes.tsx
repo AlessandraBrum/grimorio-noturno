@@ -77,6 +77,16 @@ export function PainelAjustes({ aoFechar }: { aoFechar: () => void }) {
 
           <div className="opcoes">
             <Interruptor
+              rotulo={t.player.lerSozinho}
+              ligado={preferencias.lerSozinho}
+              textoLigado={t.player.lerSozinhoLigado}
+              textoDesligado={t.player.lerSozinhoDesligado}
+              aoMudar={(ligado) => mudar('lerSozinho', ligado)}
+            />
+          </div>
+
+          <div className="opcoes">
+            <Interruptor
               rotulo={t.ajustesPainel.animacoes}
               ligado={preferencias.animacoes}
               textoLigado={t.ajustesPainel.ligadas}
@@ -87,10 +97,10 @@ export function PainelAjustes({ aoFechar }: { aoFechar: () => void }) {
           </div>
 
           <nav aria-label={t.ajustesPainel.paginas}>
-            <ul className="lista-links">
-              <li><a href="#leitura" onClick={aoFechar}>{t.leitura.titulo}</a></li>
-              <li><a href="#ajuda" onClick={aoFechar}>{t.ajuda.titulo}</a></li>
-              <li><a href="#sobre" onClick={aoFechar}>{t.abas.sobre}</a></li>
+            <ul className="lista-links lista-links--botoes">
+              <li><a className="botao-secundario" href="#leitura" onClick={aoFechar}>{t.leitura.titulo}</a></li>
+              <li><a className="botao-secundario" href="#ajuda" onClick={aoFechar}>{t.ajuda.titulo}</a></li>
+              <li><a className="botao-secundario" href="#sobre" onClick={aoFechar}>{t.abas.sobre}</a></li>
             </ul>
           </nav>
         </div>

@@ -1,10 +1,26 @@
+import { useEffect, useRef } from 'react'
 import { usePreferencias } from '../contexto/usePreferencias'
 import { useLeitura } from '../hooks/useLeitura'
 import { Icone } from './Icone'
 
 export function PlayerDeVoz({ texto, idiomaDaFala }: { texto: string; idiomaDaFala: string }) {
-  const { t } = usePreferencias()
+  const { t, preferencias, mudar } = usePreferencias()
   const leitura = useLeitura()
+
+  function lerAgora() {
+    if (!leitura.disponivel) return
+    leitura.ler(texto, idiomaDaFala)
+  }
+
+  const lerAgoraRef = useRef(lerAgora)
+
+  useEffect(() => {
+    lerAgoraRef.current = lerAgora
+  })
+
+  useEffect(() => {
+    if (preferencias.lerSozinho) lerAgoraRef.current()
+  }, [texto, preferencias.lerSozinho])
 
   if (!leitura.disponivel) {
     return <p className="aviso">{t.player.indisponivel}</p>
@@ -16,7 +32,12 @@ export function PlayerDeVoz({ texto, idiomaDaFala }: { texto: string; idiomaDaFa
   function aoApertar() {
     if (lendo) leitura.pausar()
     else if (pausado) leitura.continuar()
-    else leitura.ler(texto, idiomaDaFala)
+    else lerAgora()
+  }
+
+  function alternarSom() {
+    if (preferencias.lerSozinho) leitura.parar()
+    mudar('lerSozinho', !preferencias.lerSozinho)
   }
 
   const rotuloPrincipal = lendo ? t.player.pausar : pausado ? t.player.continuar : t.player.ler
@@ -46,7 +67,17 @@ export function PlayerDeVoz({ texto, idiomaDaFala }: { texto: string; idiomaDaFa
       </div>
       <button
         type="button"
-        className="botao-redondo"
+        className="botao-redondo player__som"
+        aria-label={t.player.lerSozinho}
+        aria-pressed={preferencias.lerSozinho}
+        title={t.player.lerSozinho}
+        onClick={alternarSom}
+      >
+        <Icone nome={preferencias.lerSozinho ? 'som' : 'mudo'} tamanho={20} />
+      </button>
+      <button
+        type="button"
+        className="botao-redondo player__parar"
         aria-label={t.player.parar}
         disabled={leitura.estado === 'parado'}
         onClick={leitura.parar}

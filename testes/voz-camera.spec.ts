@@ -1,0 +1,154 @@
+import { conferirAcessibilidade } from './apoio/acessibilidade'
+import { FOTO_DA_CARTA, semCamera, semVozNoNavegador, simularLeitorDeTexto, simularVoz } from './apoio/entradas-falsas'
+import { expect, test } from './apoio/scryfall-falso'
+
+const LEITURA_DUVIDOSA = 'xx midnight owl zzzz qqqq wwww'
+
+test.describe('Busca por voz', () => {
+  test('nome falado inteiro abre a carta direto', async ({ page }) => {
+    await simularVoz(page, ['midnight owl'])
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Falar o nome' }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Midnight Owl' })).toBeVisible()
+  })
+
+  test('só pergunta "É esta carta?" quando entende mal o nome', async ({ page }) => {
+    await simularVoz(page, [LEITURA_DUVIDOSA])
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Falar o nome' }).click()
+    await expect(page.getByRole('heading', { name: 'É esta carta?' })).toBeFocused()
+    await conferirAcessibilidade(page)
+    await page.getByRole('button', { name: 'Sim, abrir' }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Midnight Owl' })).toBeVisible()
+  })
+
+  test('avisa quando não acha a carta falada', async ({ page }) => {
+    await simularVoz(page, ['abacaxi voador'])
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Falar o nome' }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'Não achei nenhuma carta' })).toBeVisible()
+  })
+
+  test('explica o que fazer quando o navegador não reconhece voz', async ({ page }) => {
+    await semVozNoNavegador(page)
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Falar o nome' }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'Este navegador não reconhece voz' })).toBeVisible()
+  })
+})
+
+test.describe('Escanear com a câmera', () => {
+  test('o botão da busca leva para a câmera', async ({ page }) => {
+    await semCamera(page)
+    await page.goto('/')
+    await page.getByRole('link', { name: 'Escanear com a câmera' }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Escanear carta' })).toBeVisible()
+  })
+
+  test('sem câmera, oferece foto e digitar', async ({ page }) => {
+    await semCamera(page)
+    await page.goto('/#camera')
+    await expect(page.getByRole('status').filter({ hasText: 'Não consegui abrir a câmera' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Escolher uma foto' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Digitar o nome' })).toBeVisible()
+    await conferirAcessibilidade(page)
+  })
+
+  test('nome lido com clareza abre a carta direto', async ({ page }) => {
+    await semCamera(page)
+    await simularLeitorDeTexto(page, 'Midnight Owl  {2}{W}\nCreature — Bird\n')
+    await page.goto('/#camera')
+    await page.locator('input[type="file"]').setInputFiles(FOTO_DA_CARTA)
+    await expect(page.getByRole('heading', { level: 1, name: 'Midnight Owl' })).toBeVisible()
+  })
+
+  test('leitura duvidosa pergunta antes e "Não, tentar de novo" volta para a câmera', async ({ page }) => {
+    await semCamera(page)
+    await simularLeitorDeTexto(page, LEITURA_DUVIDOSA)
+    await page.goto('/#camera')
+    await page.locator('input[type="file"]').setInputFiles(FOTO_DA_CARTA)
+    await expect(page.getByRole('heading', { name: 'É esta carta?' })).toBeFocused()
+    await conferirAcessibilidade(page)
+    await page.getByRole('button', { name: 'Não, tentar de novo' }).click()
+    await expect(page.getByRole('button', { name: 'Escolher uma foto' })).toBeVisible()
+  })
+
+  test('avisa quando não consegue ler o nome', async ({ page }) => {
+    await semCamera(page)
+    await simularLeitorDeTexto(page, '~~ ..\n')
+    await page.goto('/#camera')
+    await page.locator('input[type="file"]').setInputFiles(FOTO_DA_CARTA)
+    await expect(page.getByRole('status').filter({ hasText: 'Não consegui ler o nome' })).toBeVisible()
+  })
+})
+
+async function gravarFalas(page: import('@playwright/test').Page) {
+  await page.addInitScript(() => {
+    const falas: string[] = []
+    Object.assign(window, { falasGravadas: falas })
+    window.speechSynthesis.speak = (fala: SpeechSynthesisUtterance) => {
+      falas.push(fala.text)
+    }
+  })
+}
+
+function falasGravadas(page: import('@playwright/test').Page) {
+  return page.evaluate(() => (window as unknown as { falasGravadas: string[] }).falasGravadas)
+}
+
+async function abrirCarta(page: import('@playwright/test').Page) {
+  const campo = page.getByRole('combobox', { name: 'Nome da carta' })
+  await campo.fill('Midnight Owl')
+  await campo.press('Enter')
+  await expect(page.getByRole('heading', { level: 1, name: 'Midnight Owl' })).toBeVisible()
+}
+
+const AVISO = 'use fone de ouvido ou deixe o aparelho no mudo'
+
+test.describe('Leitura em voz alta', () => {
+  test('o aviso de fone aparece e é falado só na primeira leitura', async ({ page }) => {
+    await gravarFalas(page)
+    await page.goto('/')
+    await abrirCarta(page)
+    await page.getByRole('button', { name: 'Ler em voz alta' }).click()
+    await expect(page.getByText(AVISO)).toBeVisible()
+    const primeiras = await falasGravadas(page)
+    expect(primeiras[0]).toContain('fone de ouvido')
+    expect(primeiras).toHaveLength(2)
+
+    await page.reload()
+    await abrirCarta(page)
+    await page.getByRole('button', { name: 'Ler em voz alta' }).click()
+    await expect(page.getByText(AVISO)).toBeHidden()
+    const depois = await falasGravadas(page)
+    expect(depois).toHaveLength(1)
+    expect(depois[0]).not.toContain('fone de ouvido')
+  })
+
+  test('mudo por padrão: nenhuma carta é lida sozinha', async ({ page }) => {
+    await gravarFalas(page)
+    await page.goto('/')
+    await abrirCarta(page)
+    expect(await falasGravadas(page)).toHaveLength(0)
+  })
+
+  test('com o som ligado, toda carta aberta é lida sozinha até a pessoa mutar', async ({ page }) => {
+    await gravarFalas(page)
+    await page.goto('/')
+    await abrirCarta(page)
+    const som = page.getByRole('button', { name: 'Ler toda carta sozinho' })
+    await som.click()
+    await expect(som).toHaveAttribute('aria-pressed', 'true')
+    await expect.poll(async () => (await falasGravadas(page)).length).toBeGreaterThan(0)
+
+    await page.goto('/#buscar')
+    await abrirCarta(page)
+    const antesDeMutar = (await falasGravadas(page)).length
+    expect(antesDeMutar).toBeGreaterThanOrEqual(3)
+
+    await page.getByRole('button', { name: 'Ler toda carta sozinho' }).click()
+    await page.goto('/#buscar')
+    await abrirCarta(page)
+    expect((await falasGravadas(page)).length).toBe(antesDeMutar)
+  })
+})

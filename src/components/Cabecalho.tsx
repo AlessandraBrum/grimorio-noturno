@@ -17,7 +17,9 @@ export function Cabecalho({ tela, ajustesAbertos, aoAbrirAjustes, botaoAjustesRe
   const voltar =
     tela === 'carta'
       ? { href: '#buscar', rotulo: t.carta.voltar }
-      : tela === 'sobre'
+      : tela === 'camera'
+        ? { href: '#buscar', rotulo: t.carta.voltar }
+        : tela === 'sobre'
         ? { href: '#ajuda', rotulo: t.ajuda.voltarParaAjuda }
         : null
   const tituloCelular = tela === 'carta' ? t.carta.titulo : t.abas[tela]

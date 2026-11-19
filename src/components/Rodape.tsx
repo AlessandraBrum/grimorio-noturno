@@ -10,6 +10,9 @@ export function Rodape() {
           {t.rodape.luna} <a href="#sobre">{t.abas.sobre}</a>
         </p>
         <p>{t.rodape.aviso}</p>
+        <p className="rodape__versao">
+          {t.rodape.versao} <code>{__VERSAO__}</code>
+        </p>
       </div>
     </footer>
   )

@@ -41,6 +41,17 @@ export function Sobre() {
         <p>{s.oQueETexto}</p>
       </section>
 
+      <section className="cartao" aria-labelledby="sobre-aparelhos">
+        <h2 id="sobre-aparelhos" className="titulo-secao">{s.aparelhos}</h2>
+        <p>{s.aparelhosTexto}</p>
+        <ul>
+          {s.aparelhosItens.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+        <p className="texto-apoio">{s.aparelhosTestes}</p>
+      </section>
+
       <section className="cartao" aria-labelledby="sobre-luna">
         <h2 id="sobre-luna" className="titulo-secao">{s.luna}</h2>
         <p>{s.lunaTexto}</p>

@@ -1,8 +1,10 @@
 import { BuscaCarta } from '../components/BuscaCarta'
 import { CarrosselRecentes } from '../components/CarrosselRecentes'
+import { EntradaAlternativa } from '../components/EntradaAlternativa'
 import { FimDeSecao } from '../components/SetaTopo'
 import { usePreferencias } from '../contexto/usePreferencias'
 import type { Card } from '../types/card'
+import { Icone } from '../components/Icone'
 
 export type EstadoBusca = 'parado' | 'carregando' | 'nao-encontrada' | 'sem-internet'
 
@@ -24,7 +26,13 @@ export function Buscar({ estado, aoBuscar, aoAbrirRecente }: Props) {
         <p className="texto-apoio">{t.buscar.apoio}</p>
       </div>
 
+      <p className="aviso aviso-fone" role="note">
+        <Icone nome="fone" tamanho={20} />
+        {t.player.avisoFone}
+      </p>
+
       <BuscaCarta aoEscolher={aoBuscar} />
+      <EntradaAlternativa aoAbrir={aoAbrirRecente} />
 
       <div aria-live="polite">
         {estado === 'carregando' && <p className="texto-apoio">{t.buscar.carregando}</p>}
