@@ -85,16 +85,23 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
     async function procurarSemParar() {
       while (ativo) {
         const video = videoRef.current
-        if (document.hidden || !video || !video.videoWidth) {
-          await esperar(500)
+        if (document.hidden || !video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+          await esperar(document.hidden ? 500 : 50)
           continue
         }
         try {
           const maisDetalhe = rodadas % RODADAS_ATE_A_DICA === RODADAS_ATE_A_DICA - 1
-          const imagem = prepararImagem(video, video.videoWidth, video.videoHeight, maisDetalhe ? 1920 : undefined)
-          const linhas = await lerLinhas(imagem, preferencias.idioma, (porcentagem) => {
-            if (ativo && porcentagem < 100) setMensagem(t.camera.baixando(porcentagem))
-          }, maisDetalhe)
+          const linhas = await lerLinhas(
+            () => ativo && !document.hidden
+              ? prepararImagem(video, video.videoWidth, video.videoHeight, maisDetalhe ? 1920 : undefined)
+              : null,
+            preferencias.idioma,
+            (porcentagem) => {
+              if (ativo && porcentagem < 100) setMensagem(t.camera.baixando(porcentagem))
+            },
+            maisDetalhe,
+            true,
+          )
           if (!ativo) return
           if (linhas.length > 0) {
             const { nomes, certeza } = await identificarCandidatos(linhas.map((linha) => linha.texto), preferencias.idioma)
@@ -110,7 +117,7 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
           }
           rodadas += 1
           setMensagem(rodadas >= RODADAS_ATE_A_DICA ? t.camera.dica : t.camera.procurandoNome)
-          await esperar(150)
+          await esperar(60)
         } catch (erro) {
           if (!ativo) return
           setMensagem(erro instanceof SemConexao ? t.buscar.semInternet : t.camera.dica)
@@ -138,7 +145,7 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
       const imagem = prepararImagem(bitmap, bitmap.width, bitmap.height, 1920)
       bitmap.close()
       if (sessao?.aborted) return
-      const linhas = await lerLinhas(imagem, preferencias.idioma, (porcentagem) => {
+      const linhas = await lerLinhas(() => sessao?.aborted ? null : imagem, preferencias.idioma, (porcentagem) => {
         if (!sessao?.aborted && porcentagem < 100) setMensagem(t.camera.baixando(porcentagem))
       }, true)
       if (sessao?.aborted) return

@@ -61,12 +61,23 @@ function limparLinha(linha: string) {
     .trim()
 }
 
-export async function lerLinhas(imagem: HTMLCanvasElement, idioma: Idioma, aoProgredir: (porcentagem: number) => void, corrigirInclinacao = false): Promise<LinhaLida[]> {
+export async function lerLinhas(
+  obterImagem: () => HTMLCanvasElement | null,
+  idioma: Idioma,
+  aoProgredir: (porcentagem: number) => void,
+  corrigirInclinacao = false,
+  quadroAoVivo = false,
+): Promise<LinhaLida[]> {
   progresso.set(idioma, aoProgredir)
   const tesseract = await prepararLeitor(idioma).finally(() => {
     if (progresso.get(idioma) === aoProgredir) progresso.delete(idioma)
   })
-  const { data } = await tesseract.recognize(imagem, { rotateAuto: corrigirInclinacao }, { blocks: true, text: true })
+  const imagem = obterImagem()
+  if (!imagem) return []
+  const jpeg = quadroAoVivo && await new Promise<Blob | null>((resolve) => {
+    imagem.toBlob(resolve, 'image/jpeg', 0.92)
+  })
+  const { data } = await tesseract.recognize(jpeg || imagem, { rotateAuto: corrigirInclinacao }, { blocks: true, text: true })
   const linhas = (data.blocks ?? []).flatMap((bloco) =>
     bloco.paragraphs.flatMap((paragrafo) => paragrafo.lines),
   )
