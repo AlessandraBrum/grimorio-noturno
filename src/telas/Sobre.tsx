@@ -75,6 +75,9 @@ export function Sobre() {
         </ul>
         <LinkExterno href="https://scryfall.com/docs/privacy" texto={s.politicaScryfall} aviso={s.novaAba} />
         <p>
+          <LinkExterno href="https://docs.cloud.google.com/vision/docs/data-usage" texto={s.dadosCloudVision} aviso={s.novaAba} />
+        </p>
+        <p>
           {s.contato}: <span className="quebra-livre">{EMAIL_DE_CONTATO}</span>
         </p>
         <div>

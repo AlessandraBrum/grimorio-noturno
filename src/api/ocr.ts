@@ -1,6 +1,7 @@
 import enderecoDoLeitor from 'tesseract.js/dist/worker.min.js?url'
 import type { Worker } from 'tesseract.js'
 import type { Idioma } from '../types/card'
+import { lerTituloNaNuvem } from './ocrNuvem'
 
 const PASTA_DO_LEITOR = `${import.meta.env.BASE_URL}leitor`
 const LADO_MAXIMO = 1280
@@ -167,14 +168,23 @@ export async function lerLinhas(
   aoProgredir: (porcentagem: number) => void,
   corrigirInclinacao = false,
   priorizarTitulo = true,
+  usarNuvem = false,
 ): Promise<LinhaLida[]> {
-  progresso.set(idioma, aoProgredir)
-  const tesseract = await prepararLeitor(idioma).finally(() => {
-    if (progresso.get(idioma) === aoProgredir) progresso.delete(idioma)
-  })
+  const prepararLocal = () => {
+    progresso.set(idioma, aoProgredir)
+    return prepararLeitor(idioma).finally(() => {
+      if (progresso.get(idioma) === aoProgredir) progresso.delete(idioma)
+    })
+  }
+  const leitorLocal = usarNuvem ? undefined : await prepararLocal()
   const imagem = obterImagem()
   if (!imagem) return []
   const recorte = priorizarTitulo ? recortarTitulo(imagem) : null
+  if (recorte && usarNuvem) {
+    const texto = limparLinha(await lerTituloNaNuvem(recorte, idioma))
+    if ((texto.match(/\p{L}/gu) ?? []).length >= 3) return [{ texto, topo: 0, tituloIsolado: true }]
+  }
+  const tesseract = leitorLocal ?? await prepararLocal()
   if (recorte) {
     const { PSM } = await import('tesseract.js')
     const opcoesDoTitulo = { rotateAuto: false, tessedit_pageseg_mode: PSM.SINGLE_LINE }

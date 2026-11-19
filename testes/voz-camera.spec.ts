@@ -85,6 +85,39 @@ test.describe('Escanear com a câmera', () => {
     expect(modelos).toEqual(['/leitor/por.traineddata.gz'])
   })
 
+  test('usa o recorte em nuvem apenas depois de ativar a opção', async ({ page }) => {
+    await semCamera(page)
+    let enviados = 0
+    await page.route('**/api/ocr-titulo**', async (rota) => {
+      const pedido = rota.request()
+      if (pedido.method() === 'GET') return rota.fulfill({ json: { disponivel: true } })
+      enviados += 1
+      expect(new URL(pedido.url()).searchParams.get('idioma')).toBe('pt')
+      expect(pedido.headers()['content-type']).toBe('image/jpeg')
+      expect(pedido.postDataBuffer()?.length).toBeLessThan(128 * 1024)
+      return rota.fulfill({ json: { texto: 'Midnight Owl' } })
+    })
+    await page.goto('/#camera')
+    const nuvem = page.getByRole('checkbox', { name: 'Usar leitura na nuvem (Google Cloud Vision)' })
+    await expect(nuvem).not.toBeChecked()
+    expect(enviados).toBe(0)
+    await nuvem.check()
+    const dados = await page.evaluate(() => {
+      const tela = document.createElement('canvas')
+      tela.width = 488
+      tela.height = 680
+      const contexto = tela.getContext('2d')!
+      contexto.fillStyle = '#eee'
+      contexto.fillRect(0, 0, tela.width, tela.height)
+      return tela.toDataURL('image/png').split(',')[1]
+    })
+    await page.locator('input[type="file"]').setInputFiles({
+      name: 'carta.png', mimeType: 'image/png', buffer: Buffer.from(dados, 'base64'),
+    })
+    await expect(page.getByRole('heading', { level: 1, name: 'Midnight Owl' })).toBeVisible()
+    expect(enviados).toBe(1)
+  })
+
   test('sem câmera, oferece foto e digitar', async ({ page }) => {
     await semCamera(page)
     await page.goto('/#camera')

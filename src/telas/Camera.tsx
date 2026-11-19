@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { lerLinhas, prepararImagem, prepararLeitor } from '../api/ocr'
+import { consultarOcrNuvem } from '../api/ocrNuvem'
 import { buscarCarta, identificarCandidatos, SemConexao, ServicoDeCartasIndisponivel } from '../api/scryfall'
 import { ConfirmarCarta } from '../components/ConfirmarCarta'
 import { Icone } from '../components/Icone'
@@ -24,10 +25,11 @@ async function identificarImagem(
   idioma: Idioma,
   aoProgredir: (porcentagem: number) => void,
   estaAtivo: () => boolean,
+  usarNuvem: boolean,
 ) {
   let imagem: HTMLCanvasElement | undefined
   const quadro = () => estaAtivo() ? (imagem ??= obterImagem()) : null
-  const linhas = await lerLinhas(quadro, idioma, aoProgredir, true)
+  const linhas = await lerLinhas(quadro, idioma, aoProgredir, true, true, usarNuvem)
   if (!estaAtivo()) return
   const resultado = await identificarCandidatos(linhas.map((linha) => linha.texto), idioma, 'camera', linhas[0]?.tituloIsolado)
   if (!estaAtivo() || resultado.certeza || !linhas[0]?.tituloIsolado) return resultado
@@ -39,11 +41,13 @@ async function identificarImagem(
 }
 
 export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
-  const { t, preferencias } = usePreferencias()
+  const { t, preferencias, mudar } = usePreferencias()
   const [estado, setEstado] = useState<Estado>('abrindo')
   const [mensagem, setMensagem] = useState(t.camera.abrindo)
   const [candidatos, setCandidatos] = useState<string[]>([])
   const [temCamera, setTemCamera] = useState(false)
+  const [nuvemDisponivel, setNuvemDisponivel] = useState(false)
+  const usarNuvem = nuvemDisponivel && preferencias.ocrNuvem === true
   const videoRef = useRef<HTMLVideoElement>(null)
   const fotoRef = useRef<HTMLInputElement>(null)
   const fluxoRef = useRef<MediaStream | null>(null)
@@ -59,6 +63,14 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
   useEffect(() => {
     abrirRef.current = aoAbrir
   })
+
+  useEffect(() => {
+    let ativo = true
+    void consultarOcrNuvem().then((disponivel) => {
+      if (ativo) setNuvemDisponivel(disponivel)
+    })
+    return () => { ativo = false }
+  }, [])
 
   useEffect(() => {
     prepararLeitor(preferencias.idioma).catch(() => {})
@@ -122,6 +134,7 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
               if (ativo && porcentagem < 100) setMensagem(t.camera.baixando(porcentagem))
             },
             () => ativo && !document.hidden,
+            usarNuvem,
           )
           if (!ativo) return
           if (!resultado || document.hidden) continue
@@ -158,7 +171,7 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
     return () => {
       ativo = false
     }
-  }, [estado, preferencias.idioma, t])
+  }, [estado, preferencias.idioma, t, usarNuvem])
 
   async function lerDaFoto(evento: ChangeEvent<HTMLInputElement>) {
     const arquivo = evento.target.files?.[0]
@@ -195,6 +208,7 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
           if (!sessao?.aborted && porcentagem < 100) setMensagem(t.camera.baixando(porcentagem))
         },
         () => !sessao?.aborted,
+        usarNuvem,
       )
       if (!resultado || sessao?.aborted) return
       const { nomes, certeza } = resultado
@@ -271,7 +285,18 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
               {t.camera.digitar}
             </a>
           </div>
-          <p className="legenda">{t.camera.privacidade}</p>
+          {nuvemDisponivel && (
+            <label className="legenda">
+              <input
+                type="checkbox"
+                checked={usarNuvem}
+                disabled={estado === 'lendo-foto'}
+                onChange={(evento) => mudar('ocrNuvem', evento.target.checked)}
+              />
+              {t.camera.usarNuvem}
+            </label>
+          )}
+          <p className="legenda">{usarNuvem ? t.camera.privacidadeNuvem : t.camera.privacidade}</p>
         </section>
       )}
     </div>
