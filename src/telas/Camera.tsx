@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { lerLinhas, prepararImagem, prepararLeitor } from '../api/ocr'
-import { identificarCandidatos, SemConexao } from '../api/scryfall'
+import { buscarCarta, identificarCandidatos, SemConexao, ServicoDeCartasIndisponivel } from '../api/scryfall'
 import { ConfirmarCarta } from '../components/ConfirmarCarta'
 import { Icone } from '../components/Icone'
 import { usePreferencias } from '../contexto/usePreferencias'
@@ -27,6 +27,7 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const fotoRef = useRef<HTMLInputElement>(null)
   const fluxoRef = useRef<MediaStream | null>(null)
+  const abrirRef = useRef(aoAbrir)
   const sessaoRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
@@ -34,6 +35,10 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
     sessaoRef.current = sessao
     return () => sessao.abort()
   }, [])
+
+  useEffect(() => {
+    abrirRef.current = aoAbrir
+  })
 
   useEffect(() => {
     prepararLeitor(preferencias.idioma).catch(() => {})
@@ -89,7 +94,7 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
           continue
         }
         try {
-          const maisDetalhe = rodadas % RODADAS_ATE_A_DICA === RODADAS_ATE_A_DICA - 1
+          const maisDetalhe = rodadas % 2 === 1
           const linhas = await lerLinhas(
             () => ativo && !document.hidden
               ? prepararImagem(video, video.videoWidth, video.videoHeight, maisDetalhe ? 1920 : undefined)
@@ -100,11 +105,20 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
             },
             maisDetalhe,
             true,
+            !maisDetalhe,
           )
           if (!ativo) return
           if (linhas.length > 0) {
-            const { nomes } = await identificarCandidatos(linhas.map((linha) => linha.texto), preferencias.idioma, 'camera')
+            const { nomes, certeza } = await identificarCandidatos(linhas.map((linha) => linha.texto), preferencias.idioma, 'camera', linhas[0]?.tituloIsolado)
             if (!ativo) return
+            if (certeza) {
+              const carta = await buscarCarta(nomes[0], preferencias.idioma)
+              if (ativo) {
+                vibrar()
+                abrirRef.current(carta)
+              }
+              return
+            }
             if (nomes.length > 0) {
               vibrar()
               setCandidatos(nomes)
@@ -117,7 +131,8 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
           await esperar(60)
         } catch (erro) {
           if (!ativo) return
-          setMensagem(erro instanceof SemConexao ? t.buscar.semInternet : t.camera.dica)
+          setMensagem(erro instanceof SemConexao ? t.buscar.semInternet
+            : erro instanceof ServicoDeCartasIndisponivel ? t.buscar.servicoIndisponivel : t.camera.dica)
           await esperar(3000)
         }
       }
@@ -133,21 +148,48 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
     const arquivo = evento.target.files?.[0]
     evento.target.value = ''
     if (!arquivo) return
+    await lerImagem(async () => {
+      const bitmap = await createImageBitmap(arquivo)
+      try {
+        return prepararImagem(bitmap, bitmap.width, bitmap.height, 1920)
+      } finally {
+        bitmap.close()
+      }
+    })
+  }
+
+  function capturar() {
+    const video = videoRef.current
+    if (!video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return
+    void lerImagem(() => prepararImagem(video, video.videoWidth, video.videoHeight, 1920))
+  }
+
+  async function lerImagem(obterImagem: () => HTMLCanvasElement | Promise<HTMLCanvasElement>) {
     const sessao = sessaoRef.current?.signal
     const anterior = estado
     setEstado('lendo-foto')
     setMensagem(t.camera.lendo)
     try {
-      const bitmap = await createImageBitmap(arquivo)
-      const imagem = prepararImagem(bitmap, bitmap.width, bitmap.height, 1920)
-      bitmap.close()
+      const imagem = await obterImagem()
       if (sessao?.aborted) return
       const linhas = await lerLinhas(() => sessao?.aborted ? null : imagem, preferencias.idioma, (porcentagem) => {
         if (!sessao?.aborted && porcentagem < 100) setMensagem(t.camera.baixando(porcentagem))
       }, true)
       if (sessao?.aborted) return
-      const { nomes } = await identificarCandidatos(linhas.map((linha) => linha.texto), preferencias.idioma, 'camera')
+      let resultado = await identificarCandidatos(linhas.map((linha) => linha.texto), preferencias.idioma, 'camera', linhas[0]?.tituloIsolado)
+      if (!resultado.certeza && linhas[0]?.tituloIsolado && !sessao?.aborted) {
+        const quadroInteiro = await lerLinhas(() => sessao?.aborted ? null : imagem, preferencias.idioma, () => {}, true, false, false)
+        if (sessao?.aborted) return
+        const segundaLeitura = await identificarCandidatos(quadroInteiro.map((linha) => linha.texto), preferencias.idioma, 'camera')
+        if (segundaLeitura.certeza || !resultado.nomes.length) resultado = segundaLeitura
+      }
+      const { nomes, certeza } = resultado
       if (sessao?.aborted) return
+      if (certeza) {
+        const carta = await buscarCarta(nomes[0], preferencias.idioma)
+        if (!sessao?.aborted) aoAbrir(carta)
+        return
+      }
       if (nomes.length > 0) {
         setCandidatos(nomes)
         setEstado('confirmar')
@@ -158,8 +200,10 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
       setMensagem(t.camera.naoLi)
     } catch (erro) {
       if (sessao?.aborted) return
-      setEstado(erro instanceof SemConexao ? 'erro' : anterior)
-      setMensagem(erro instanceof SemConexao ? t.buscar.semInternet : t.camera.naoLi)
+      const falhaDeBusca = erro instanceof SemConexao || erro instanceof ServicoDeCartasIndisponivel
+      setEstado(falhaDeBusca ? 'erro' : anterior)
+      setMensagem(erro instanceof SemConexao ? t.buscar.semInternet
+        : erro instanceof ServicoDeCartasIndisponivel ? t.buscar.servicoIndisponivel : t.camera.naoLi)
     }
   }
 
@@ -195,6 +239,12 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
           </p>
 
           <div className="camera__acoes">
+            {temCamera && (
+              <button type="button" className="botao-principal" disabled={estado !== 'procurando' && estado !== 'erro'} onClick={capturar}>
+                <Icone nome="camera" tamanho={20} />
+                {t.camera.capturar}
+              </button>
+            )}
             <button
               type="button"
               className={temCamera ? 'botao-secundario' : 'botao-principal'}

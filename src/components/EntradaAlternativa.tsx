@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { buscarCarta, identificarCandidatos, SemConexao } from '../api/scryfall'
+import { buscarCarta, identificarCandidatos, SemConexao, ServicoDeCartasIndisponivel } from '../api/scryfall'
 import { usePreferencias } from '../contexto/usePreferencias'
 import type { Card } from '../types/card'
 import { ConfirmarCarta } from './ConfirmarCarta'
@@ -57,7 +57,8 @@ export function EntradaAlternativa({ aoAbrir }: { aoAbrir: (carta: Card) => void
       setMensagem('')
     } catch (erro) {
       setEstado('erro')
-      setMensagem(erro instanceof SemConexao ? t.buscar.semInternet : t.entrada.naoAchei)
+      setMensagem(erro instanceof SemConexao ? t.buscar.semInternet
+        : erro instanceof ServicoDeCartasIndisponivel ? t.buscar.servicoIndisponivel : t.entrada.naoAchei)
     }
   }
 

@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/scryfall/cards/named",
+      "destination": "https://api.scryfall.com/cards/named"
+    },
+    {
+      "source": "/api/scryfall/cards/search",
+      "destination": "https://api.scryfall.com/cards/search"
+    },
+    {
+      "source": "/api/scryfall/cards/autocomplete",
+      "destination": "https://api.scryfall.com/cards/autocomplete"
+    }
+  ]
+}

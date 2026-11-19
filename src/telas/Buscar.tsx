@@ -6,7 +6,7 @@ import { usePreferencias } from '../contexto/usePreferencias'
 import type { Card } from '../types/card'
 import { Icone } from '../components/Icone'
 
-export type EstadoBusca = 'parado' | 'carregando' | 'nao-encontrada' | 'sem-internet'
+export type EstadoBusca = 'parado' | 'carregando' | 'nao-encontrada' | 'sem-internet' | 'servico-indisponivel'
 
 interface Props {
   estado: EstadoBusca
@@ -38,6 +38,7 @@ export function Buscar({ estado, aoBuscar, aoAbrirRecente }: Props) {
         {estado === 'carregando' && <p className="texto-apoio">{t.buscar.carregando}</p>}
         {estado === 'nao-encontrada' && <p className="aviso erro">{t.buscar.naoEncontrada}</p>}
         {estado === 'sem-internet' && <p className="aviso erro">{t.buscar.semInternet}</p>}
+        {estado === 'servico-indisponivel' && <p className="aviso erro">{t.buscar.servicoIndisponivel}</p>}
       </div>
 
       <CarrosselRecentes aoAbrir={aoAbrirRecente} />

@@ -46,6 +46,10 @@ O app não pede cadastro e não usa anúncios nem rastreio. Suas preferências e
 | PWA (manifesto) | Permite abrir por link ou QR code e, se a pessoa quiser, instalar na tela inicial |
 | Fontsource | As fontes Atkinson Hyperlegible Next e Cormorant Garamond ficam dentro do app, sem depender do Google Fonts |
 | Oxlint | Revisa o código e aponta erros comuns |
+| MediaDevices e Canvas | Capturam o vídeo e preparam os quadros no navegador |
+| Tesseract.js e WebAssembly | Reconhecem o nome da carta no aparelho, em português ou inglês |
+| API do Scryfall | Consulta os nomes, textos e dados das cartas |
+| Vercel | Hospeda o site e encaminha a consulta ao Scryfall se a conexão direta falhar |
 
 ### Como o app conversa com o Scryfall
 

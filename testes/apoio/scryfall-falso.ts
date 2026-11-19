@@ -58,6 +58,7 @@ export async function simularScryfall(page: Page) {
 }
 
 export async function simularSemInternet(page: Page) {
+  await page.context().setOffline(true)
   await page.route('https://api.scryfall.com/**', (rota) => rota.abort('internetdisconnected'))
 }
 

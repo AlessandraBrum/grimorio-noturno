@@ -7,6 +7,7 @@ let ultimaRequisicao = 0
 
 export class CartaNaoEncontrada extends Error {}
 export class SemConexao extends Error {}
+export class ServicoDeCartasIndisponivel extends Error {}
 
 async function esperarVez() {
   const agora = Date.now()
@@ -19,18 +20,23 @@ async function esperarVez() {
 
 async function pedir<T>(caminho: string, sinal?: AbortSignal): Promise<T> {
   await esperarVez()
+  const opcoes = { headers: { Accept: 'application/json' }, signal: sinal }
   let resposta: Response
   try {
-    resposta = await fetch(`${BASE}${caminho}`, {
-      headers: { Accept: 'application/json' },
-      signal: sinal,
-    })
-  } catch (erro) {
-    if (erro instanceof DOMException && erro.name === 'AbortError') throw erro
-    throw new SemConexao()
+    resposta = await fetch(BASE + caminho, opcoes)
+  } catch {
+    sinal?.throwIfAborted()
+    if (!navigator.onLine) throw new SemConexao()
+    try {
+      resposta = await fetch('/api/scryfall' + caminho, opcoes)
+    } catch {
+      sinal?.throwIfAborted()
+      throw new ServicoDeCartasIndisponivel()
+    }
   }
+  if (!resposta.headers.get('content-type')?.includes('application/json')) throw new ServicoDeCartasIndisponivel()
   if (resposta.status === 404) throw new CartaNaoEncontrada()
-  if (!resposta.ok) throw new Error(`Scryfall respondeu ${resposta.status}`)
+  if (!resposta.ok) throw new ServicoDeCartasIndisponivel()
   return resposta.json() as Promise<T>
 }
 
@@ -178,7 +184,7 @@ function semelhanca(a: string, b: string) {
 }
 
 const SEMELHANCA_SEGURA = 0.6
-const SEMELHANCA_PARA_CONFIRMAR = 0.75
+const SEMELHANCA_PARA_CONFIRMAR = 0.66
 
 export interface Identificacao {
   nomes: string[]
@@ -217,8 +223,8 @@ function tiposDaCarta(carta: CartaScryfall, idioma: Idioma) {
     .filter((tipo): tipo is string => !!tipo)
 }
 
-async function procurarTexto(texto: string, idioma: Idioma): Promise<Achado> {
-  const chave = idioma + ':' + normalizar(texto)
+async function procurarTexto(texto: string, idioma: Idioma, origem: 'voz' | 'camera'): Promise<Achado> {
+  const chave = origem + ':' + idioma + ':' + normalizar(texto)
   const guardado = jaProcurados.get(chave)
   if (guardado) return guardado
 
@@ -230,26 +236,34 @@ async function procurarTexto(texto: string, idioma: Idioma): Promise<Achado> {
     achado = { nomes: [carta.name], pontuacao: avaliarNome(texto, carta, idioma), tipos: tiposDaCarta(carta, idioma) }
   } catch (erro) {
     if (!(erro instanceof CartaNaoEncontrada)) throw erro
+  }
+
+  if (!achado.nomes.length || (origem === 'camera' && achado.pontuacao < SEMELHANCA_PARA_CONFIRMAR)) {
     try {
-      const encontradas = (await buscarPorTexto(texto, idioma)).slice(0, 3)
-      for (const carta of encontradas) {
+      const encontradas = (await buscarPorTexto(texto, idioma))
+        .map((carta) => ({ carta, pontuacao: avaliarNome(texto, carta, idioma) }))
+        .sort((a, b) => b.pontuacao - a.pontuacao)
+        .slice(0, 3)
+      for (const { carta } of encontradas) {
         cartasIdentificadas.set(idioma + ':' + carta.name.toLowerCase(), carta)
       }
       const primeira = encontradas[0]
-      achado = {
-        nomes: encontradas.map((carta) => carta.name),
-        pontuacao: primeira && encontradas.length === 1 ? avaliarNome(texto, primeira, idioma) : 0,
-        tipos: primeira ? tiposDaCarta(primeira, idioma) : [],
+      if (primeira && primeira.pontuacao >= achado.pontuacao) {
+        achado = {
+          nomes: encontradas.map(({ carta }) => carta.name),
+          pontuacao: primeira.pontuacao,
+          tipos: tiposDaCarta(primeira.carta, idioma),
+        }
       }
-    } catch (erroBusca) {
-      if (!(erroBusca instanceof CartaNaoEncontrada)) throw erroBusca
+    } catch (erro) {
+      if (!(erro instanceof CartaNaoEncontrada)) throw erro
     }
   }
   jaProcurados.set(chave, achado)
   return achado
 }
 
-export async function identificarCandidatos(textos: string[], idioma: Idioma, origem: 'voz' | 'camera' = 'voz'): Promise<Identificacao> {
+export async function identificarCandidatos(textos: string[], idioma: Idioma, origem: 'voz' | 'camera' = 'voz', tituloIsolado = false): Promise<Identificacao> {
   const nomes: string[] = []
   const guardar = (nome: string) => {
     if (!nomes.includes(nome)) nomes.push(nome)
@@ -258,7 +272,7 @@ export async function identificarCandidatos(textos: string[], idioma: Idioma, or
   for (const [indice, texto] of textos.slice(0, 4).entries()) {
     const limpo = texto.trim()
     if (limpo.length < 3) continue
-    const achado = await procurarTexto(limpo, idioma)
+    const achado = await procurarTexto(limpo, idioma, origem)
     if (origem === 'voz') {
       if (achado.pontuacao >= SEMELHANCA_SEGURA) return { nomes: achado.nomes.slice(0, 1), certeza: true }
       achado.nomes.forEach(guardar)
@@ -269,7 +283,10 @@ export async function identificarCandidatos(textos: string[], idioma: Idioma, or
       const tipoLido = textos.slice(indice + 1).some((linha) =>
         achado.tipos.some((tipo) => normalizar(linha) === normalizar(tipo)),
       )
-      if (indice === 0) return { nomes: achado.nomes, certeza: tipoLido }
+      if (indice === 0) {
+        const tituloComposto = (limpo.match(/\p{L}+/gu) ?? []).length > 1 && normalizar(limpo).length >= 8
+        return { nomes: achado.nomes.slice(0, 1), certeza: tipoLido || tituloIsolado || tituloComposto }
+      }
       return { nomes: [...new Set([...nomes, ...achado.nomes])].slice(0, 3), certeza: false }
     }
     if (achado.pontuacao >= SEMELHANCA_PARA_CONFIRMAR) achado.nomes.forEach(guardar)

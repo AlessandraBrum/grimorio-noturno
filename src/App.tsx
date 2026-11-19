@@ -58,7 +58,7 @@ export function App() {
     } catch (erro) {
       if (erro instanceof CartaNaoEncontrada) setEstadoBusca('nao-encontrada')
       else if (erro instanceof SemConexao) setEstadoBusca('sem-internet')
-      else setEstadoBusca('nao-encontrada')
+      else setEstadoBusca('servico-indisponivel')
     }
   }
 

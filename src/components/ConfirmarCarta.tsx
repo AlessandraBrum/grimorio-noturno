@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { buscarCarta } from '../api/scryfall'
+import { buscarCarta, SemConexao, ServicoDeCartasIndisponivel } from '../api/scryfall'
 import { usePreferencias } from '../contexto/usePreferencias'
 import type { Card } from '../types/card'
 import { Icone } from './Icone'
@@ -14,7 +14,7 @@ export function ConfirmarCarta({ candidatos, aoAbrir, aoRecomecar }: Props) {
   const { t, preferencias } = usePreferencias()
   const [escolhido, setEscolhido] = useState(candidatos[0])
   const [carta, setCarta] = useState<Card | null>(null)
-  const [falhou, setFalhou] = useState(false)
+  const [erroBusca, setErroBusca] = useState('')
   const tituloRef = useRef<HTMLHeadingElement>(null)
 
   useEffect(() => {
@@ -23,13 +23,16 @@ export function ConfirmarCarta({ candidatos, aoAbrir, aoRecomecar }: Props) {
       .then((encontrada) => {
         if (!ativo) return
         setCarta(encontrada)
-        setFalhou(false)
+        setErroBusca('')
       })
-      .catch(() => ativo && setFalhou(true))
+      .catch((erro) => {
+        if (ativo) setErroBusca(erro instanceof SemConexao ? t.buscar.semInternet
+          : erro instanceof ServicoDeCartasIndisponivel ? t.buscar.servicoIndisponivel : t.entrada.naoAchei)
+      })
     return () => {
       ativo = false
     }
-  }, [escolhido, preferencias.idioma])
+  }, [escolhido, preferencias.idioma, t])
 
   useEffect(() => {
     tituloRef.current?.focus()
@@ -43,8 +46,8 @@ export function ConfirmarCarta({ candidatos, aoAbrir, aoRecomecar }: Props) {
       <h2 id="titulo-confirmar" ref={tituloRef} tabIndex={-1} className="confirmar__titulo">
         {t.entrada.confirmar}
       </h2>
-      {falhou && <p className="aviso erro">{t.entrada.naoAchei}</p>}
-      {!falhou && (
+      {erroBusca && <p className="aviso erro" role="status">{erroBusca}</p>}
+      {!erroBusca && (
         <div className="confirmar__carta">
           {carta?.imageUrl ? (
             <img className="confirmar__imagem" src={carta.imageUrl} alt={t.carta.imagem(nome)} width={146} height={204} />
@@ -57,7 +60,7 @@ export function ConfirmarCarta({ candidatos, aoAbrir, aoRecomecar }: Props) {
         </div>
       )}
       <div className="confirmar__acoes">
-        <button type="button" className="botao-principal" disabled={!carta || falhou} onClick={() => carta && aoAbrir(carta)}>
+        <button type="button" className="botao-principal" disabled={!carta || !!erroBusca} onClick={() => carta && aoAbrir(carta)}>
           <Icone nome="check" tamanho={20} />
           {t.entrada.sim}
         </button>
@@ -73,7 +76,7 @@ export function ConfirmarCarta({ candidatos, aoAbrir, aoRecomecar }: Props) {
               <li key={outro}>
                 <button type="button" className="chip" lang="en" onClick={() => {
                   setCarta(null)
-                  setFalhou(false)
+                  setErroBusca('')
                   setEscolhido(outro)
                 }}>
                   {outro}

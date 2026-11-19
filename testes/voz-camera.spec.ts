@@ -60,11 +60,13 @@ test.describe('Escanear com a câmera', () => {
           contexto.save()
           contexto.translate(85 + Math.sin(tempo / 60) * 16, 160)
           contexto.filter = tempo < 800 ? 'blur(12px)' : 'none'
-          contexto.fillStyle = 'white'
+          contexto.fillStyle = 'black'
           contexto.fillRect(0, 0, 470, 650)
+          contexto.fillStyle = 'white'
+          contexto.fillRect(12, 12, 446, 626)
           contexto.fillStyle = 'black'
           contexto.font = 'bold 48px Arial'
-          contexto.fillText('Midnight Owl', 20, 60)
+          contexto.fillText('Midnight Owl', 40, 61)
           contexto.fillText('Creature - Bird', 20, 370)
           contexto.restore()
           requestAnimationFrame(desenhar)
@@ -79,9 +81,7 @@ test.describe('Escanear com a câmera', () => {
       if (request.url().endsWith('.traineddata.gz')) modelos.push(new URL(request.url()).pathname)
     })
     await page.goto('/#camera')
-    await expect(page.getByRole('heading', { name: 'É esta carta?' })).toBeFocused({ timeout: 15_000 })
-    await page.getByRole('button', { name: 'Sim, abrir' }).click()
-    await expect(page.getByRole('heading', { level: 1, name: 'Midnight Owl' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Midnight Owl' })).toBeVisible({ timeout: 15_000 })
     expect(modelos).toEqual(['/leitor/por.traineddata.gz'])
   })
 
@@ -94,14 +94,11 @@ test.describe('Escanear com a câmera', () => {
     await conferirAcessibilidade(page)
   })
 
-  test('nome lido com clareza pede confirmação e permite escanear outra', async ({ page }) => {
+  test('nome lido com clareza abre direto e permite escanear outra', async ({ page }) => {
     await semCamera(page)
     await simularLeitorDeTexto(page, 'Midnight Owl  {2}{W}\nCreature — Bird\n')
     await page.goto('/#camera')
     await page.locator('input[type="file"]').setInputFiles(FOTO_DA_CARTA)
-    await expect(page.getByRole('heading', { name: 'É esta carta?' })).toBeFocused()
-    await expect(page.getByRole('heading', { level: 1, name: 'Midnight Owl' })).toHaveCount(0)
-    await page.getByRole('button', { name: 'Sim, abrir' }).click()
     await expect(page.getByRole('heading', { level: 1, name: 'Midnight Owl' })).toBeVisible()
 
     const escanearOutra = page.getByRole('link', { name: 'Escanear outra carta' })
@@ -159,8 +156,6 @@ test.describe('Escanear com a câmera', () => {
     }))
     await page.goto('/#camera')
     await page.locator('input[type="file"]').setInputFiles(FOTO_DA_CARTA)
-    await expect(page.getByRole('heading', { name: 'É esta carta?' })).toBeFocused()
-    await page.getByRole('button', { name: 'Sim, abrir' }).click()
     await expect(page.getByRole('heading', { level: 1, name: /Liliana, Heretical Healer/ })).toBeVisible()
   })
 
