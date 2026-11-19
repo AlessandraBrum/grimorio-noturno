@@ -184,7 +184,6 @@ const pt = {
   },
   ajustesPainel: {
     idioma: 'Idioma do app',
-    aplicarIdioma: 'Aplicar idioma',
     tema: 'Tema',
     temas: { escuro: 'Noturno', claro: 'Claro', sistema: 'Sistema' },
     animacoes: 'Animações',
@@ -390,7 +389,6 @@ const en: Textos = {
   },
   ajustesPainel: {
     idioma: 'App language',
-    aplicarIdioma: 'Apply language',
     tema: 'Theme',
     temas: { escuro: 'Night', claro: 'Light', sistema: 'System' },
     animacoes: 'Animations',

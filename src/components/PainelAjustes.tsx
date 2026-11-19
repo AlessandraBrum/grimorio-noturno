@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { usePreferencias, type Tema } from '../contexto/usePreferencias'
 import type { Idioma } from '../types/card'
 import { Icone } from './Icone'
@@ -7,7 +7,6 @@ import { Opcoes } from './Opcoes'
 
 export function PainelAjustes({ aoFechar }: { aoFechar: () => void }) {
   const { t, preferencias, mudar } = usePreferencias()
-  const [idiomaEscolhido, setIdiomaEscolhido] = useState<Idioma>(preferencias.idioma)
   const botaoFecharRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
@@ -42,26 +41,16 @@ export function PainelAjustes({ aoFechar }: { aoFechar: () => void }) {
         </div>
 
         <div className="gaveta__corpo">
-          <div className="opcoes">
-            <Opcoes<Idioma>
-              legenda={t.ajustesPainel.idioma}
-              nome="idioma"
-              valor={idiomaEscolhido}
-              opcoes={[
-                { valor: 'pt', rotulo: 'Português', lang: 'pt-BR' },
-                { valor: 'en', rotulo: 'English', lang: 'en' },
-              ]}
-              aoMudar={setIdiomaEscolhido}
-            />
-            <button
-              type="button"
-              className="botao-principal"
-              disabled={idiomaEscolhido === preferencias.idioma}
-              onClick={() => mudar('idioma', idiomaEscolhido)}
-            >
-              {t.ajustesPainel.aplicarIdioma}
-            </button>
-          </div>
+          <Opcoes<Idioma>
+            legenda={t.ajustesPainel.idioma}
+            nome="idioma"
+            valor={preferencias.idioma}
+            opcoes={[
+              { valor: 'pt', rotulo: 'Português', lang: 'pt-BR' },
+              { valor: 'en', rotulo: 'English', lang: 'en' },
+            ]}
+            aoMudar={(idioma) => mudar('idioma', idioma)}
+          />
 
           <Opcoes<Tema>
             legenda={t.ajustesPainel.tema}

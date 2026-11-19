@@ -4,11 +4,28 @@ import { buscarCarta, identificarCandidatos, SemConexao, ServicoDeCartasIndispon
 import { EntradaAlternativa } from '../components/EntradaAlternativa'
 import { Icone } from '../components/Icone'
 import { usePreferencias } from '../contexto/usePreferencias'
+import { carregarBase, reconhecerImagem, type Reconhecimento } from '../reconhecimento/reconhecer'
 import type { Card, Idioma } from '../types/card'
 
 type Estado = 'abrindo' | 'procurando' | 'sem-camera' | 'lendo-foto' | 'erro'
 
 const RODADAS_ATE_A_DICA = 4
+const RODADAS_DE_IMAGEM_ATE_A_DICA = 40
+const CERTEZA_IMEDIATA = { distancia: 12, margem: 8 }
+const CERTEZA_REPETIDA = { distancia: 22, margem: 4 }
+
+function confiavel(resultado: Reconhecimento | null, limite: { distancia: number; margem: number }) {
+  return !!resultado && resultado.distancia <= limite.distancia && resultado.margem >= limite.margem
+}
+
+async function baseDisponivel() {
+  try {
+    await carregarBase()
+    return true
+  } catch {
+    return false
+  }
+}
 
 function esperar(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -66,7 +83,9 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
   })
 
   useEffect(() => {
-    prepararLeitor().catch(() => {})
+    void baseDisponivel().then((pronta) => {
+      if (!pronta) prepararLeitor().catch(() => {})
+    })
   }, [])
 
   useEffect(() => {
@@ -112,7 +131,46 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
     let recebeuQuadro = false
     let rodadas = 0
 
+    async function procurarPelaImagem() {
+      let anterior: Reconhecimento | null = null
+      while (ativo) {
+        const video = videoRef.current
+        if (document.hidden || !video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+          await esperar(document.hidden ? 500 : 50)
+          continue
+        }
+        if (!recebeuQuadro) {
+          recebeuQuadro = true
+          setLendoQuadros(true)
+          setMensagem(t.camera.procurandoNome)
+        }
+        const resultado = await reconhecerImagem(video, video.videoWidth, video.videoHeight)
+        if (!ativo) return
+        const repetido = !!resultado && anterior?.nome === resultado.nome
+          && confiavel(resultado, CERTEZA_REPETIDA) && confiavel(anterior, CERTEZA_REPETIDA)
+        if (resultado && (confiavel(resultado, CERTEZA_IMEDIATA) || repetido)) {
+          avisarQueReconheceu()
+          setMensagem(t.camera.carregandoFicha)
+          try {
+            const carta = await buscarCarta(resultado.nome, preferencias.idioma)
+            if (ativo) abrirRef.current(carta)
+            return
+          } catch (erro) {
+            if (!ativo) return
+            setMensagem(erro instanceof SemConexao ? t.buscar.semInternet
+              : erro instanceof ServicoDeCartasIndisponivel ? t.buscar.servicoIndisponivel : t.camera.dica)
+            await esperar(3000)
+          }
+        }
+        anterior = resultado
+        rodadas += 1
+        if (rodadas === RODADAS_DE_IMAGEM_ATE_A_DICA) setMensagem(t.camera.dica)
+        await esperar(30)
+      }
+    }
+
     async function procurarSemParar() {
+      if (await baseDisponivel()) return procurarPelaImagem()
       while (ativo) {
         const video = videoRef.current
         if (document.hidden || !video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
@@ -183,6 +241,14 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
     try {
       const imagem = await obterImagem()
       if (sessao?.aborted) return
+      const pelaImagem = (await baseDisponivel()) ? await reconhecerImagem(imagem, imagem.width, imagem.height) : null
+      if (sessao?.aborted) return
+      if (pelaImagem && confiavel(pelaImagem, CERTEZA_REPETIDA)) {
+        avisarQueReconheceu()
+        const carta = await buscarCarta(pelaImagem.nome, preferencias.idioma)
+        if (!sessao?.aborted) aoAbrir(carta)
+        return
+      }
       const { nomes, certeza } = await identificarImagem(imagem, preferencias.idioma, (porcentagem) => {
         if (!sessao?.aborted && porcentagem < 100) setMensagem(t.camera.baixando(porcentagem))
       })
