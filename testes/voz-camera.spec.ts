@@ -218,7 +218,7 @@ test.describe('Leitura em voz alta', () => {
     await gravarFalas(page)
     await page.goto('/')
     await abrirCarta(page)
-    const som = page.getByRole('button', { name: 'Ler toda carta sozinho' })
+    const som = page.getByRole('button', { name: 'Ler toda carta automaticamente' })
     await som.click()
     await expect(som).toHaveAttribute('aria-pressed', 'true')
     await expect.poll(async () => (await falasGravadas(page)).length).toBe(1)
@@ -229,7 +229,7 @@ test.describe('Leitura em voz alta', () => {
     await expect.poll(async () => (await falasGravadas(page)).length).toBe(depoisDeLigar + 1)
     const antesDeMutar = (await falasGravadas(page)).length
 
-    await page.getByRole('button', { name: 'Ler toda carta sozinho' }).click()
+    await page.getByRole('button', { name: 'Ler toda carta automaticamente' }).click()
     await page.goto('/#buscar')
     await abrirCarta(page)
     expect((await falasGravadas(page)).length).toBe(antesDeMutar)

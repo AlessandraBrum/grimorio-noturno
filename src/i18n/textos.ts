@@ -92,10 +92,10 @@ const pt = {
     velocidade: 'Velocidade',
     velocidadeFalada: (v: number) => `${v} vez${v === 1 ? '' : 'es'} a velocidade normal`,
     indisponivel: 'Este navegador não tem leitura em voz alta.',
-    lerSozinho: 'Ler toda carta sozinho',
+    lerSozinho: 'Ler toda carta automaticamente',
     lerSozinhoLigado: 'Som ligado: cada carta aberta é lida em voz alta.',
     lerSozinhoDesligado: 'Mudo: nenhuma carta é lida sozinha. O botão de ler continua funcionando.',
-    avisoFone: 'Dica: use fone de ouvido ou deixe o aparelho no mudo e leia na tela, para o seu oponente não ouvir as cartas da sua mão. Para ouvir cada carta ao abri-la, ative “Ler toda carta sozinho” no menu Ajustes.',
+    avisoFone: 'Dica: use fone de ouvido ou deixe o aparelho no mudo e leia na tela, para o seu oponente não ouvir as cartas da sua mão. Para ouvir cada carta ao abri-la, ative “Ler toda carta automaticamente” no menu Ajustes.',
   },
   leitura: {
     titulo: 'Modo de leitura',
