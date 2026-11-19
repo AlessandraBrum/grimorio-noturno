@@ -25,6 +25,7 @@ export function App() {
   const [ajustesAbertos, setAjustesAbertos] = useState(false)
   const botaoAjustesRef = useRef<HTMLButtonElement>(null)
   const primeiraTela = useRef(true)
+  const focarBusca = useRef(false)
 
   const telaVisivel = tela === 'carta' && !carta ? 'buscar' : tela
 
@@ -36,7 +37,9 @@ export function App() {
       return
     }
     window.scrollTo({ top: 0 })
-    document.getElementById('titulo-tela')?.focus()
+    const destinoDoFoco = telaVisivel === 'buscar' && focarBusca.current ? 'nome-da-carta' : 'titulo-tela'
+    focarBusca.current = false
+    document.getElementById(destinoDoFoco)?.focus()
   }, [telaVisivel, carta, t])
 
   useEffect(() => {
@@ -78,6 +81,11 @@ export function App() {
     }
   }, [ajustesAbertos])
 
+  function digitarDaCamera() {
+    focarBusca.current = true
+    irPara('buscar')
+  }
+
   function fecharAjustes() {
     setAjustesAbertos(false)
   }
@@ -104,7 +112,7 @@ export function App() {
           {telaVisivel === 'leitura' && <Leitura />}
           {telaVisivel === 'ajuda' && <Ajuda />}
           {telaVisivel === 'sobre' && <Sobre />}
-          {telaVisivel === 'camera' && <Camera key={preferencias.idioma} aoAbrir={abrirCarta} />}
+          {telaVisivel === 'camera' && <Camera key={preferencias.idioma} aoAbrir={abrirCarta} aoDigitar={digitarDaCamera} />}
         </main>
         <Rodape />
         <SetaTopo key={telaVisivel} />

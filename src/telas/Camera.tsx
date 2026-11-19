@@ -2,12 +2,12 @@ import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { lerLinhas, prepararImagem, prepararLeitor } from '../api/ocr'
 import { consultarOcrNuvem } from '../api/ocrNuvem'
 import { buscarCarta, identificarCandidatos, SemConexao, ServicoDeCartasIndisponivel } from '../api/scryfall'
-import { ConfirmarCarta } from '../components/ConfirmarCarta'
+import { EntradaAlternativa } from '../components/EntradaAlternativa'
 import { Icone } from '../components/Icone'
 import { usePreferencias } from '../contexto/usePreferencias'
 import type { Card, Idioma } from '../types/card'
 
-type Estado = 'abrindo' | 'procurando' | 'sem-camera' | 'lendo-foto' | 'confirmar' | 'erro'
+type Estado = 'abrindo' | 'procurando' | 'sem-camera' | 'lendo-foto' | 'erro'
 
 const RODADAS_ATE_A_DICA = 4
 const LADO_DO_QUADRO = 1920
@@ -40,12 +40,12 @@ async function identificarImagem(
   return segundaLeitura.certeza || !resultado.nomes.length ? segundaLeitura : resultado
 }
 
-export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
+export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void; aoDigitar: () => void }) {
   const { t, preferencias, mudar } = usePreferencias()
   const [estado, setEstado] = useState<Estado>('abrindo')
   const [mensagem, setMensagem] = useState(t.camera.abrindo)
-  const [candidatos, setCandidatos] = useState<string[]>([])
   const [temCamera, setTemCamera] = useState(false)
+  const [buscandoPorVoz, setBuscandoPorVoz] = useState(false)
   const [nuvemDisponivel, setNuvemDisponivel] = useState(false)
   const usarNuvem = nuvemDisponivel && preferencias.ocrNuvem === true
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -92,7 +92,7 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
       setTemCamera(true)
       if (videoRef.current) {
         videoRef.current.srcObject = fluxo
-        await videoRef.current.play().catch(() => {})
+        void videoRef.current.play().catch(() => {})
       }
       setEstado('procurando')
       setMensagem(t.camera.procurandoNome)
@@ -109,7 +109,7 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
   }, [t])
 
   useEffect(() => {
-    if (estado !== 'procurando') return
+    if (estado !== 'procurando' || buscandoPorVoz) return
     const video = videoRef.current
     if (video && fluxoRef.current && video.srcObject !== fluxoRef.current) {
       video.srcObject = fluxoRef.current
@@ -117,7 +117,6 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
     }
     let ativo = true
     let rodadas = 0
-    let candidatoAnterior: string | undefined
 
     async function procurarSemParar() {
       while (ativo) {
@@ -146,15 +145,6 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
             }
             return
           }
-          if (resultado.nomes.length > 0) {
-            if (resultado.nomes[0] === candidatoAnterior) {
-              vibrar()
-              setCandidatos(resultado.nomes)
-              setEstado('confirmar')
-              return
-            }
-          }
-          candidatoAnterior = resultado.nomes[0]
           rodadas += 1
           setMensagem(rodadas >= RODADAS_ATE_A_DICA ? t.camera.dica : t.camera.procurandoNome)
           await esperar(60)
@@ -171,7 +161,7 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
     return () => {
       ativo = false
     }
-  }, [estado, preferencias.idioma, t, usarNuvem])
+  }, [buscandoPorVoz, estado, preferencias.idioma, t, usarNuvem])
 
   async function lerDaFoto(evento: ChangeEvent<HTMLInputElement>) {
     const arquivo = evento.target.files?.[0]
@@ -185,12 +175,6 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
         bitmap.close()
       }
     })
-  }
-
-  function capturar() {
-    const video = videoRef.current
-    if (!video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return
-    void lerImagem(() => prepararImagem(video, video.videoWidth, video.videoHeight, LADO_DO_QUADRO))
   }
 
   async function lerImagem(obterImagem: () => HTMLCanvasElement | Promise<HTMLCanvasElement>) {
@@ -217,12 +201,6 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
         if (!sessao?.aborted) aoAbrir(carta)
         return
       }
-      if (nomes.length > 0) {
-        setCandidatos(nomes)
-        setEstado('confirmar')
-        setMensagem('')
-        return
-      }
       setEstado(temCamera ? 'procurando' : 'erro')
       setMensagem(t.camera.naoLi)
     } catch (erro) {
@@ -232,12 +210,6 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
       setMensagem(erro instanceof SemConexao ? t.buscar.semInternet
         : erro instanceof ServicoDeCartasIndisponivel ? t.buscar.servicoIndisponivel : t.camera.naoLi)
     }
-  }
-
-  function recomecar() {
-    setCandidatos([])
-    setEstado(temCamera ? 'procurando' : 'sem-camera')
-    setMensagem(temCamera ? t.camera.procurandoNome : t.camera.semCamera)
   }
 
   const comAviso = estado === 'erro' || estado === 'sem-camera'
@@ -251,54 +223,52 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
         <p className="texto-apoio">{t.camera.apoio}</p>
       </div>
 
-      {estado === 'confirmar' ? (
-        <ConfirmarCarta key={candidatos.join('|')} candidatos={candidatos} aoAbrir={aoAbrir} aoRecomecar={recomecar} />
-      ) : (
-        <section className="camera" aria-label={t.camera.titulo}>
-          <div className={temCamera ? 'camera__moldura' : 'camera__moldura camera__moldura--vazia'}>
-            <video ref={videoRef} className="camera__video" playsInline muted aria-label={t.camera.video} hidden={!temCamera} />
-            {temCamera && <div className="camera__mira" aria-hidden="true" />}
-            {!temCamera && <Icone nome="camera" tamanho={48} className="camera__icone" />}
-          </div>
+      <section className="camera" aria-label={t.camera.titulo}>
+        <div className={temCamera ? 'camera__moldura' : 'camera__moldura camera__moldura--vazia'}>
+          <video ref={videoRef} className="camera__video" playsInline muted aria-label={t.camera.video} hidden={!temCamera} />
+          {temCamera && <div className="camera__mira" aria-hidden="true" />}
+          {!temCamera && <Icone nome="camera" tamanho={48} className="camera__icone" />}
+        </div>
 
-          <p role="status" aria-live="polite" className={comAviso ? 'aviso erro' : 'legenda camera__status'}>
-            {mensagem}
-          </p>
+        <p role="status" aria-live="polite" className={comAviso ? 'aviso erro' : 'legenda camera__status'}>
+          {buscandoPorVoz ? '' : mensagem}
+        </p>
 
-          <div className="camera__acoes">
-            {temCamera && (
-              <button type="button" className="botao-principal" disabled={estado !== 'procurando' && estado !== 'erro'} onClick={capturar}>
-                <Icone nome="camera" tamanho={20} />
-                {t.camera.capturar}
+        <div className="camera__acoes">
+          <button
+            type="button"
+            className={temCamera ? 'botao-secundario' : 'botao-principal'}
+            disabled={estado === 'lendo-foto' || buscandoPorVoz}
+            onClick={() => fotoRef.current?.click()}
+          >
+            {t.camera.foto}
+          </button>
+          <input ref={fotoRef} className="visualmente-oculto" type="file" accept="image/*" tabIndex={-1} aria-hidden="true" onChange={lerDaFoto} />
+        </div>
+        {estado !== 'lendo-foto' && (
+          <EntradaAlternativa
+            aoAbrir={aoAbrir}
+            aoMudarBuscaPorVoz={setBuscandoPorVoz}
+            acaoAoLado={(
+              <button type="button" className="botao-entrada" onClick={aoDigitar}>
+                {t.camera.digitar}
               </button>
             )}
-            <button
-              type="button"
-              className={temCamera ? 'botao-secundario' : 'botao-principal'}
+          />
+        )}
+        {nuvemDisponivel && (
+          <label className="legenda">
+            <input
+              type="checkbox"
+              checked={usarNuvem}
               disabled={estado === 'lendo-foto'}
-              onClick={() => fotoRef.current?.click()}
-            >
-              {t.camera.foto}
-            </button>
-            <input ref={fotoRef} className="visualmente-oculto" type="file" accept="image/*" tabIndex={-1} aria-hidden="true" onChange={lerDaFoto} />
-            <a className="link-acao" href="#buscar">
-              {t.camera.digitar}
-            </a>
-          </div>
-          {nuvemDisponivel && (
-            <label className="legenda">
-              <input
-                type="checkbox"
-                checked={usarNuvem}
-                disabled={estado === 'lendo-foto'}
-                onChange={(evento) => mudar('ocrNuvem', evento.target.checked)}
-              />
-              {t.camera.usarNuvem}
-            </label>
-          )}
-          <p className="legenda">{usarNuvem ? t.camera.privacidadeNuvem : t.camera.privacidade}</p>
-        </section>
-      )}
+              onChange={(evento) => mudar('ocrNuvem', evento.target.checked)}
+            />
+            {t.camera.usarNuvem}
+          </label>
+        )}
+        <p className="legenda">{usarNuvem ? t.camera.privacidadeNuvem : t.camera.privacidade}</p>
+      </section>
     </div>
   )
 }

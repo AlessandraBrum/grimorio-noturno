@@ -45,7 +45,7 @@ test.describe('Escanear com a câmera', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Escanear carta' })).toBeVisible()
   })
 
-  test('o OCR real reconhece uma carta fora do centro após quadros borrados', async ({ page }) => {
+  test('a câmera reconhece automaticamente sem capturar nem confirmar', async ({ page }) => {
     await page.addInitScript(() => {
       const getUserMedia = async () => {
         const canvas = document.createElement('canvas')
@@ -81,6 +81,7 @@ test.describe('Escanear com a câmera', () => {
       if (request.url().endsWith('.traineddata.gz')) modelos.push(new URL(request.url()).pathname)
     })
     await page.goto('/#camera')
+    await expect(page.getByRole('button', { name: 'Capturar quadro e ler' })).toHaveCount(0)
     await expect(page.getByRole('heading', { level: 1, name: 'Midnight Owl' })).toBeVisible({ timeout: 15_000 })
     expect(modelos).toEqual(['/leitor/por.traineddata.gz'])
   })
@@ -118,13 +119,25 @@ test.describe('Escanear com a câmera', () => {
     expect(enviados).toBe(1)
   })
 
-  test('sem câmera, oferece foto e digitar', async ({ page }) => {
+  test('sem câmera, oferece foto e botões de voz e digitação', async ({ page }) => {
     await semCamera(page)
     await page.goto('/#camera')
     await expect(page.getByRole('status').filter({ hasText: 'Não consegui abrir a câmera' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Escolher uma foto' })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Digitar o nome' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Falar o nome' })).toBeVisible()
+    const digitar = page.getByRole('button', { name: 'Digitar o nome' })
+    await expect(digitar).toBeVisible()
     await conferirAcessibilidade(page)
+    await digitar.click()
+    await expect(page.getByRole('combobox', { name: 'Nome da carta' })).toBeFocused()
+  })
+
+  test('a busca por voz pode abrir uma carta a partir da tela da câmera', async ({ page }) => {
+    await semCamera(page)
+    await simularVoz(page, ['midnight owl'])
+    await page.goto('/#camera')
+    await page.getByRole('button', { name: 'Falar o nome' }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Midnight Owl' })).toBeFocused()
   })
 
   test('nome lido com clareza abre direto e permite escanear outra', async ({ page }) => {
@@ -140,18 +153,17 @@ test.describe('Escanear com a câmera', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Escanear carta' })).toBeFocused()
   })
 
-  test('leitura duvidosa pergunta antes e "Não, tentar de novo" volta para a câmera', async ({ page }) => {
+  test('leitura duvidosa de foto avisa sem pedir confirmação', async ({ page }) => {
     await semCamera(page)
     await simularLeitorDeTexto(page, 'Midnight Owl zz')
     await page.goto('/#camera')
     await page.locator('input[type="file"]').setInputFiles(FOTO_DA_CARTA)
-    await expect(page.getByRole('heading', { name: 'É esta carta?' })).toBeFocused()
-    await conferirAcessibilidade(page)
-    await page.getByRole('button', { name: 'Não, tentar de novo' }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'Não consegui ler o nome' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'É esta carta?' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Escolher uma foto' })).toBeVisible()
   })
 
-  test('uma palavra das regras sem o tipo correspondente exige confirmação', async ({ page }) => {
+  test('uma palavra das regras sem o tipo correspondente não abre uma carta', async ({ page }) => {
     await semCamera(page)
     await simularLeitorDeTexto(page, 'Lifelink\nCreature - Human Cleric')
     await page.route('https://api.scryfall.com/cards/named?fuzzy=Lifelink', (rota) => rota.fulfill({
@@ -159,7 +171,8 @@ test.describe('Escanear com a câmera', () => {
     }))
     await page.goto('/#camera')
     await page.locator('input[type="file"]').setInputFiles(FOTO_DA_CARTA)
-    await expect(page.getByRole('heading', { name: 'É esta carta?' })).toBeFocused()
+    await expect(page.getByRole('status').filter({ hasText: 'Não consegui ler o nome' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'É esta carta?' })).toHaveCount(0)
     await expect(page.getByRole('heading', { level: 1, name: 'Escanear carta' })).toBeVisible()
   })
 

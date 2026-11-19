@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { buscarCarta, identificarCandidatos, SemConexao, ServicoDeCartasIndisponivel } from '../api/scryfall'
 import { usePreferencias } from '../contexto/usePreferencias'
 import type { Card } from '../types/card'
@@ -29,33 +29,55 @@ function construtorDeVoz(): ConstrutorDeReconhecedor | undefined {
   return janela.SpeechRecognition ?? janela.webkitSpeechRecognition
 }
 
-export function EntradaAlternativa({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
+interface Props {
+  aoAbrir: (carta: Card) => void
+  acaoAoLado?: ReactNode
+  aoMudarBuscaPorVoz?: (ocupada: boolean) => void
+}
+
+export function EntradaAlternativa({ aoAbrir, acaoAoLado, aoMudarBuscaPorVoz }: Props) {
   const { t, preferencias } = usePreferencias()
   const [estado, setEstado] = useState<Estado>('parado')
   const [mensagem, setMensagem] = useState('')
   const [candidatos, setCandidatos] = useState<string[]>([])
   const reconhecedorRef = useRef<Reconhecedor | null>(null)
 
-  useEffect(() => () => reconhecedorRef.current?.stop(), [])
+  const montado = useRef(false)
+  useEffect(() => {
+    montado.current = true
+    return () => {
+      montado.current = false
+      const reconhecedor = reconhecedorRef.current
+      if (reconhecedor) {
+        reconhecedor.onresult = null
+        reconhecedor.onerror = null
+        reconhecedor.onend = null
+        reconhecedor.stop()
+      }
+    }
+  }, [])
 
   async function procurar(textos: string[]) {
     setEstado('procurando')
     setMensagem(`${t.entrada.ouvi(textos[0])} ${t.entrada.procurando}.`)
     try {
       const { nomes, certeza } = await identificarCandidatos(textos, preferencias.idioma)
+      if (!montado.current) return
       if (nomes.length === 0) {
         setEstado('erro')
         setMensagem(`${t.entrada.ouvi(textos[0])} ${t.entrada.naoAchei}`)
         return
       }
       if (certeza) {
-        aoAbrir(await buscarCarta(nomes[0], preferencias.idioma))
+        const carta = await buscarCarta(nomes[0], preferencias.idioma)
+        if (montado.current) aoAbrir(carta)
         return
       }
       setCandidatos(nomes)
       setEstado('confirmar')
       setMensagem('')
     } catch (erro) {
+      if (!montado.current) return
       setEstado('erro')
       setMensagem(erro instanceof SemConexao ? t.buscar.semInternet
         : erro instanceof ServicoDeCartasIndisponivel ? t.buscar.servicoIndisponivel : t.entrada.naoAchei)
@@ -111,6 +133,10 @@ export function EntradaAlternativa({ aoAbrir }: { aoAbrir: (carta: Card) => void
   }
 
   const ouvindo = estado === 'ouvindo'
+  const ocupada = ouvindo || estado === 'procurando' || estado === 'confirmar'
+  useEffect(() => {
+    aoMudarBuscaPorVoz?.(ocupada)
+  }, [aoMudarBuscaPorVoz, ocupada])
 
   return (
     <div className="entrada">
@@ -118,15 +144,16 @@ export function EntradaAlternativa({ aoAbrir }: { aoAbrir: (carta: Card) => void
         <button
           type="button"
           className={ouvindo ? 'botao-entrada botao-entrada--ativo' : 'botao-entrada'}
+          disabled={estado === 'procurando' || estado === 'confirmar'}
           onClick={ouvir}
         >
           <Icone nome="microfone" />
           <span>{ouvindo ? t.entrada.parar : t.entrada.falar}</span>
         </button>
-        <a className="botao-entrada" href="#camera">
+        {acaoAoLado ?? <a className="botao-entrada" href="#camera">
           <Icone nome="camera" />
           <span>{t.entrada.escanear}</span>
-        </a>
+        </a>}
       </div>
       <p role="status" aria-live="polite" className={estado === 'erro' ? 'aviso erro entrada__status' : 'legenda entrada__status'}>
         {mensagem}
