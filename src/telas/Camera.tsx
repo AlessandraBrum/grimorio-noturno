@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { lerLinhas, prepararImagem, prepararLeitor } from '../api/ocr'
-import { consultarOcrNuvem } from '../api/ocrNuvem'
 import { buscarCarta, identificarCandidatos, SemConexao, ServicoDeCartasIndisponivel } from '../api/scryfall'
 import { EntradaAlternativa } from '../components/EntradaAlternativa'
 import { Icone } from '../components/Icone'
@@ -10,46 +9,46 @@ import type { Card, Idioma } from '../types/card'
 type Estado = 'abrindo' | 'procurando' | 'sem-camera' | 'lendo-foto' | 'erro'
 
 const RODADAS_ATE_A_DICA = 4
-const LADO_DO_QUADRO = 1920
 
 function esperar(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-function vibrar() {
+function avisarQueReconheceu() {
   if ('vibrate' in navigator) navigator.vibrate(150)
+  try {
+    const audio = new AudioContext()
+    const tom = audio.createOscillator()
+    const volume = audio.createGain()
+    tom.frequency.value = 880
+    volume.gain.setValueAtTime(0.15, audio.currentTime)
+    volume.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + 0.18)
+    tom.connect(volume).connect(audio.destination)
+    tom.start()
+    tom.stop(audio.currentTime + 0.18)
+    tom.onended = () => void audio.close()
+  } catch {
+    return
+  }
 }
 
 async function identificarImagem(
-  obterImagem: () => HTMLCanvasElement,
+  imagem: HTMLCanvasElement,
   idioma: Idioma,
   aoProgredir: (porcentagem: number) => void,
-  estaAtivo: () => boolean,
-  usarNuvem: boolean,
-  semCorrecaoDeInclinacao = false,
 ) {
-  let imagem: HTMLCanvasElement | undefined
-  const quadro = () => estaAtivo() ? (imagem ??= obterImagem()) : null
-  const linhas = await lerLinhas(quadro, idioma, aoProgredir, !semCorrecaoDeInclinacao, true, usarNuvem)
-  if (!estaAtivo()) return
-  const resultado = await identificarCandidatos(linhas.map((linha) => linha.texto), idioma, 'camera', linhas[0]?.tituloIsolado)
-  if (!estaAtivo() || resultado.certeza || !linhas[0]?.tituloIsolado) return resultado
-
-  const quadroInteiro = await lerLinhas(quadro, idioma, aoProgredir, false, false)
-  if (!estaAtivo()) return
-  const segundaLeitura = await identificarCandidatos(quadroInteiro.map((linha) => linha.texto), idioma, 'camera')
-  return segundaLeitura.certeza || !resultado.nomes.length ? segundaLeitura : resultado
+  const linhas = await lerLinhas(imagem, aoProgredir)
+  if (!linhas.length) return { nomes: [], certeza: false }
+  return identificarCandidatos(linhas.map((linha) => linha.texto), idioma, 'camera')
 }
 
 export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void; aoDigitar: () => void }) {
-  const { t, preferencias, mudar } = usePreferencias()
+  const { t, preferencias } = usePreferencias()
   const [estado, setEstado] = useState<Estado>('abrindo')
   const [mensagem, setMensagem] = useState(t.camera.abrindo)
   const [temCamera, setTemCamera] = useState(false)
   const [lendoQuadros, setLendoQuadros] = useState(false)
   const [buscandoPorVoz, setBuscandoPorVoz] = useState(false)
-  const [nuvemDisponivel, setNuvemDisponivel] = useState(false)
-  const usarNuvem = nuvemDisponivel && preferencias.ocrNuvem === true
   const videoRef = useRef<HTMLVideoElement>(null)
   const fotoRef = useRef<HTMLInputElement>(null)
   const fluxoRef = useRef<MediaStream | null>(null)
@@ -67,16 +66,8 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
   })
 
   useEffect(() => {
-    let ativo = true
-    void consultarOcrNuvem().then((disponivel) => {
-      if (ativo) setNuvemDisponivel(disponivel)
-    })
-    return () => { ativo = false }
+    prepararLeitor().catch(() => {})
   }, [])
-
-  useEffect(() => {
-    prepararLeitor(preferencias.idioma).catch(() => {})
-  }, [preferencias.idioma])
 
   useEffect(() => {
     let ativo = true
@@ -120,7 +111,6 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
     let ativo = true
     let recebeuQuadro = false
     let rodadas = 0
-    let tituloAnterior: string | undefined
 
     async function procurarSemParar() {
       while (ativo) {
@@ -130,35 +120,22 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
           continue
         }
         try {
-          const resultado = await identificarImagem(
-            () => {
-              if (!recebeuQuadro) {
-                recebeuQuadro = true
-                setLendoQuadros(true)
-                setMensagem(t.camera.procurandoNome)
-              }
-              return prepararImagem(video, video.videoWidth, video.videoHeight, LADO_DO_QUADRO)
-            },
-            preferencias.idioma,
-            (porcentagem) => {
-              if (ativo && porcentagem < 100) setMensagem(t.camera.baixando(porcentagem))
-            },
-            () => ativo && !document.hidden,
-            usarNuvem,
-            rodadas % 2 === 1,
-          )
+          if (!recebeuQuadro) {
+            recebeuQuadro = true
+            setLendoQuadros(true)
+            setMensagem(t.camera.procurandoNome)
+          }
+          const imagem = prepararImagem(video, video.videoWidth, video.videoHeight)
+          const resultado = await identificarImagem(imagem, preferencias.idioma, (porcentagem) => {
+            if (ativo && porcentagem < 100) setMensagem(t.camera.baixando(porcentagem))
+          })
           if (!ativo) return
-          if (!resultado || document.hidden) continue
-          const tituloRepetido = resultado.tituloProvavel && resultado.tituloProvavel === tituloAnterior
-          const nome = resultado.certeza ? resultado.nomes[0] : tituloRepetido ? resultado.tituloProvavel : undefined
-          tituloAnterior = resultado.tituloProvavel
-          if (nome) {
+          if (document.hidden) continue
+          if (resultado.certeza) {
+            avisarQueReconheceu()
             setMensagem(t.camera.carregandoFicha)
-            const carta = await buscarCarta(nome, preferencias.idioma)
-            if (ativo) {
-              vibrar()
-              abrirRef.current(carta)
-            }
+            const carta = await buscarCarta(resultado.nomes[0], preferencias.idioma)
+            if (ativo) abrirRef.current(carta)
             return
           }
           rodadas += 1
@@ -181,7 +158,7 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
     return () => {
       ativo = false
     }
-  }, [buscandoPorVoz, estado, preferencias.idioma, t, usarNuvem])
+  }, [buscandoPorVoz, estado, preferencias.idioma, t])
 
   async function lerDaFoto(evento: ChangeEvent<HTMLInputElement>) {
     const arquivo = evento.target.files?.[0]
@@ -190,7 +167,7 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
     await lerImagem(async () => {
       const bitmap = await createImageBitmap(arquivo)
       try {
-        return prepararImagem(bitmap, bitmap.width, bitmap.height, LADO_DO_QUADRO)
+        return prepararImagem(bitmap, bitmap.width, bitmap.height)
       } finally {
         bitmap.close()
       }
@@ -206,18 +183,12 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
     try {
       const imagem = await obterImagem()
       if (sessao?.aborted) return
-      const resultado = await identificarImagem(
-        () => imagem,
-        preferencias.idioma,
-        (porcentagem) => {
-          if (!sessao?.aborted && porcentagem < 100) setMensagem(t.camera.baixando(porcentagem))
-        },
-        () => !sessao?.aborted,
-        usarNuvem,
-      )
-      if (!resultado || sessao?.aborted) return
-      const { nomes, certeza } = resultado
+      const { nomes, certeza } = await identificarImagem(imagem, preferencias.idioma, (porcentagem) => {
+        if (!sessao?.aborted && porcentagem < 100) setMensagem(t.camera.baixando(porcentagem))
+      })
+      if (sessao?.aborted) return
       if (certeza) {
+        avisarQueReconheceu()
         const carta = await buscarCarta(nomes[0], preferencias.idioma)
         if (!sessao?.aborted) aoAbrir(carta)
         return
@@ -261,8 +232,6 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
           {!temCamera && <Icone nome="camera" tamanho={48} className="camera__icone" />}
         </div>
 
-
-
         <div className="camera__acoes">
           <button
             type="button"
@@ -285,18 +254,7 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
             )}
           />
         )}
-        {nuvemDisponivel && (
-          <label className="legenda">
-            <input
-              type="checkbox"
-              checked={usarNuvem}
-              disabled={estado === 'lendo-foto'}
-              onChange={(evento) => mudar('ocrNuvem', evento.target.checked)}
-            />
-            {t.camera.usarNuvem}
-          </label>
-        )}
-        <p className="legenda">{usarNuvem ? t.camera.privacidadeNuvem : t.camera.privacidade}</p>
+        <p className="legenda">{t.camera.privacidade}</p>
       </section>
     </div>
   )

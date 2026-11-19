@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test'
 
-const PORTA = 5199
+const PORTA = Number(process.env.PORTA_TESTES ?? 5199)
 
 export default defineConfig({
   testDir: './testes',

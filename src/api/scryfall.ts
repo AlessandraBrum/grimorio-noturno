@@ -216,7 +216,6 @@ const SEMELHANCA_PARA_CONFIRMAR = 0.66
 export interface Identificacao {
   nomes: string[]
   certeza: boolean
-  tituloProvavel?: string
 }
 
 interface Achado {
@@ -293,9 +292,29 @@ async function procurarTexto(texto: string, idioma: Idioma, origem: 'voz' | 'cam
   return achado
 }
 
-export async function identificarCandidatos(textos: string[], idioma: Idioma, origem: 'voz' | 'camera' = 'voz', tituloIsolado = false): Promise<Identificacao> {
+const PALAVRAS_DE_TIPO = [
+  'creature', 'criatura', 'instant', 'instantanea', 'sorcery', 'feitico', 'enchantment', 'encantamento',
+  'artifact', 'artefato', 'land', 'terreno', 'planeswalker', 'battle', 'batalha', 'kindred', 'tribal',
+]
+
+function palavrasDeTipo(texto: string) {
+  const palavras = texto
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .split(/[^a-z]+/)
+  return PALAVRAS_DE_TIPO.filter((tipo) => palavras.includes(tipo))
+}
+
+function tipoContradiz(linhasSeguintes: string[], tiposDaCarta: string[]) {
+  if (!tiposDaCarta.length) return false
+  const daCarta = new Set(tiposDaCarta.flatMap(palavrasDeTipo))
+  const linhasDeTipo = linhasSeguintes.map(palavrasDeTipo).filter((tipos) => tipos.length > 0)
+  return linhasDeTipo.length > 0 && linhasDeTipo.every((tipos) => !tipos.some((tipo) => daCarta.has(tipo)))
+}
+
+export async function identificarCandidatos(textos: string[], idioma: Idioma, origem: 'voz' | 'camera' = 'voz'): Promise<Identificacao> {
   const nomes: string[] = []
-  let tituloProvavel: string | undefined
   const guardar = (nome: string) => {
     if (!nomes.includes(nome)) nomes.push(nome)
   }
@@ -304,20 +323,10 @@ export async function identificarCandidatos(textos: string[], idioma: Idioma, or
     const limpo = texto.trim()
     if (limpo.length < 3) continue
     const achado = await procurarTexto(limpo, idioma, origem)
-    if (origem === 'voz') {
-      if (achado.pontuacao >= SEMELHANCA_SEGURA) return { nomes: achado.nomes.slice(0, 1), certeza: true }
-      achado.nomes.forEach(guardar)
-      continue
+    const contradiz = origem === 'camera' && tipoContradiz(textos.slice(indice + 1), achado.tipos)
+    if (achado.pontuacao >= SEMELHANCA_SEGURA && !achado.ambigua && !contradiz) {
+      return { nomes: achado.nomes.slice(0, 1), certeza: true }
     }
-
-    if (achado.pontuacao < SEMELHANCA_PARA_CONFIRMAR || achado.ambigua) continue
-    const tipoLido = textos.slice(indice + 1).some((linha) =>
-      achado.tipos.some((tipo) => semelhanca(linha, tipo) >= 0.87),
-    )
-    const tituloComposto = (limpo.match(/\p{L}+/gu) ?? []).length > 1 && normalizar(limpo).length >= 8
-    const tituloExato = indice === 0 && achado.pontuacao === 1 && (tituloIsolado || tituloComposto)
-    if (tipoLido || tituloExato) return { nomes: achado.nomes.slice(0, 1), certeza: true }
-    if (indice === 0 && tituloIsolado && achado.pontuacao >= 0.82) tituloProvavel = achado.nomes[0]
     achado.nomes.forEach(guardar)
   }
 
@@ -330,5 +339,5 @@ export async function identificarCandidatos(textos: string[], idioma: Idioma, or
       return { nomes, certeza: false }
     }
   }
-  return { nomes: nomes.slice(0, 3), certeza: false, tituloProvavel }
+  return { nomes: nomes.slice(0, 3), certeza: false }
 }

@@ -1578,6 +1578,10 @@ body::before {
     animation: aparecer 0.3s ease;
   }
 
+  [data-movimento="ligado"] .camera__indicador {
+    animation: pulsar 1.2s ease-in-out infinite;
+  }
+
   [data-movimento="ligado"] .gaveta {
     animation: entrar-pela-direita 0.25s ease;
   }
@@ -1608,6 +1612,18 @@ body::before {
 
   [data-movimento="ligado"] .ceu__cadente--2 {
     animation: cair 13s ease-in 7s infinite;
+  }
+}
+
+@keyframes pulsar {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.75);
   }
 }
 

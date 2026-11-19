@@ -3,7 +3,7 @@ import { FimDeSecao } from '../components/SetaTopo'
 import { usePreferencias } from '../contexto/usePreferencias'
 
 const PORTFOLIO = 'https://alessandrabrum.com/'
-const LUNA_SOFTWARES = ''
+const LUNA_SOFTWARES = 'https://lunasoftwares.com/'
 
 const LINKS_DA_AUTORA = [
   { chave: 'portfolio', href: 'https://links.alessandrabrum.com/' },

@@ -45,18 +45,8 @@ test.describe('Escanear com a câmera', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Escanear carta' })).toBeVisible()
   })
 
-  test('a câmera recorta o título em fundo escuro e abre a carta sem interação', async ({ page }) => {
+  test('a câmera lê a carta em fundo escuro e abre sem interação', async ({ page }) => {
     await page.addInitScript(() => {
-      const WorkerOriginal = window.Worker
-      const modos: string[] = []
-      Object.assign(window, { modosDeOcr: modos })
-      window.Worker = class extends WorkerOriginal {
-        postMessage(...[mensagem, opcoes]: Parameters<Worker['postMessage']>) {
-          const modo = mensagem?.payload?.options?.tessedit_pageseg_mode
-          if (mensagem?.action === 'recognize' && modo) modos.push(modo)
-          super.postMessage(mensagem, opcoes)
-        }
-      }
       const getUserMedia = async () => {
         const canvas = document.createElement('canvas')
         canvas.width = 1600
@@ -94,41 +84,7 @@ test.describe('Escanear com a câmera', () => {
     await expect(page.getByRole('status').filter({ hasText: 'Leitura automática ativa' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Capturar quadro e ler' })).toHaveCount(0)
     await expect(page.getByRole('heading', { level: 1, name: 'Midnight Owl' })).toBeVisible({ timeout: 15_000 })
-    expect(modelos).toEqual(['/leitor/por.traineddata.gz'])
-    expect(await page.evaluate(() => Reflect.get(window, 'modosDeOcr'))).toContain('7')
-  })
-
-  test('usa o recorte em nuvem apenas depois de ativar a opção', async ({ page }) => {
-    await semCamera(page)
-    let enviados = 0
-    await page.route('**/api/ocr-titulo**', async (rota) => {
-      const pedido = rota.request()
-      if (pedido.method() === 'GET') return rota.fulfill({ json: { disponivel: true } })
-      enviados += 1
-      expect(new URL(pedido.url()).searchParams.get('idioma')).toBe('pt')
-      expect(pedido.headers()['content-type']).toBe('image/jpeg')
-      expect(pedido.postDataBuffer()?.length).toBeLessThan(128 * 1024)
-      return rota.fulfill({ json: { texto: 'Midnight Owl' } })
-    })
-    await page.goto('/#camera')
-    const nuvem = page.getByRole('checkbox', { name: 'Usar leitura na nuvem (Google Cloud Vision)' })
-    await expect(nuvem).not.toBeChecked()
-    expect(enviados).toBe(0)
-    await nuvem.check()
-    const dados = await page.evaluate(() => {
-      const tela = document.createElement('canvas')
-      tela.width = 488
-      tela.height = 680
-      const contexto = tela.getContext('2d')!
-      contexto.fillStyle = '#eee'
-      contexto.fillRect(0, 0, tela.width, tela.height)
-      return tela.toDataURL('image/png').split(',')[1]
-    })
-    await page.locator('input[type="file"]').setInputFiles({
-      name: 'carta.png', mimeType: 'image/png', buffer: Buffer.from(dados, 'base64'),
-    })
-    await expect(page.getByRole('heading', { level: 1, name: 'Midnight Owl' })).toBeVisible()
-    expect(enviados).toBe(1)
+    expect(modelos.sort()).toEqual(['/leitor/eng.traineddata.gz', '/leitor/por.traineddata.gz'])
   })
 
   test('sem câmera, oferece foto e botões de voz e digitação', async ({ page }) => {
@@ -173,14 +129,13 @@ test.describe('Escanear com a câmera', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Midnight Owl' })).toBeVisible()
   })
 
-  test('leitura duvidosa de foto avisa sem pedir confirmação', async ({ page }) => {
+  test('nome lido com pequeno erro abre direto, sem pedir confirmação', async ({ page }) => {
     await semCamera(page)
     await simularLeitorDeTexto(page, 'Midnight Owl zz')
     await page.goto('/#camera')
     await page.locator('input[type="file"]').setInputFiles(FOTO_DA_CARTA)
-    await expect(page.getByRole('status').filter({ hasText: 'Não consegui ler o nome' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Midnight Owl' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'É esta carta?' })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: 'Escolher uma foto' })).toBeVisible()
   })
 
   test('uma palavra das regras sem o tipo correspondente não abre uma carta', async ({ page }) => {
@@ -223,6 +178,27 @@ test.describe('Escanear com a câmera', () => {
     await page.goto('/#camera')
     await page.locator('input[type="file"]').setInputFiles(FOTO_DA_CARTA)
     await expect(page.getByRole('heading', { level: 1, name: /Liliana, Heretical Healer/ })).toBeVisible()
+  })
+
+  test('vibra e toca um som curto quando reconhece a carta', async ({ page }) => {
+    await semCamera(page)
+    await simularLeitorDeTexto(page, 'Midnight Owl\nCreature — Bird')
+    await page.addInitScript(() => {
+      const avisos: string[] = []
+      Object.assign(window, { avisosDeReconhecimento: avisos })
+      Object.defineProperty(navigator, 'vibrate', { value: () => avisos.push('vibrou') })
+      const AudioOriginal = window.AudioContext
+      window.AudioContext = class extends AudioOriginal {
+        createOscillator() {
+          avisos.push('som')
+          return super.createOscillator()
+        }
+      }
+    })
+    await page.goto('/#camera')
+    await page.locator('input[type="file"]').setInputFiles(FOTO_DA_CARTA)
+    await expect(page.getByRole('heading', { level: 1, name: 'Midnight Owl' })).toBeVisible()
+    expect(await page.evaluate(() => Reflect.get(window, 'avisosDeReconhecimento'))).toEqual(['vibrou', 'som'])
   })
 
   test('avisa quando não consegue ler o nome', async ({ page }) => {
