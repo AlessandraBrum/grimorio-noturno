@@ -153,6 +153,14 @@ test.describe('Escanear com a câmera', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Escanear carta' })).toBeFocused()
   })
 
+  test('recupera um nome com erro de OCR quando o tipo da carta bate', async ({ page }) => {
+    await semCamera(page)
+    await simularLeitorDeTexto(page, 'Midnight Owl zz\nCreature — Bird')
+    await page.goto('/#camera')
+    await page.locator('input[type="file"]').setInputFiles(FOTO_DA_CARTA)
+    await expect(page.getByRole('heading', { level: 1, name: 'Midnight Owl' })).toBeVisible()
+  })
+
   test('leitura duvidosa de foto avisa sem pedir confirmação', async ({ page }) => {
     await semCamera(page)
     await simularLeitorDeTexto(page, 'Midnight Owl zz')

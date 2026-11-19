@@ -192,12 +192,14 @@ const SEMELHANCA_PARA_CONFIRMAR = 0.66
 export interface Identificacao {
   nomes: string[]
   certeza: boolean
+  tituloProvavel?: string
 }
 
 interface Achado {
   nomes: string[]
   pontuacao: number
   tipos: string[]
+  ambigua?: boolean
 }
 
 const jaProcurados = new Map<string, Achado>()
@@ -256,6 +258,7 @@ async function procurarTexto(texto: string, idioma: Idioma, origem: 'voz' | 'cam
           nomes: encontradas.map(({ carta }) => carta.name),
           pontuacao: primeira.pontuacao,
           tipos: tiposDaCarta(primeira.carta, idioma),
+          ambigua: encontradas.some(({ carta, pontuacao }) => carta.name !== primeira.carta.name && primeira.pontuacao - pontuacao < 0.08),
         }
       }
     } catch (erro) {
@@ -268,6 +271,7 @@ async function procurarTexto(texto: string, idioma: Idioma, origem: 'voz' | 'cam
 
 export async function identificarCandidatos(textos: string[], idioma: Idioma, origem: 'voz' | 'camera' = 'voz', tituloIsolado = false): Promise<Identificacao> {
   const nomes: string[] = []
+  let tituloProvavel: string | undefined
   const guardar = (nome: string) => {
     if (!nomes.includes(nome)) nomes.push(nome)
   }
@@ -282,17 +286,15 @@ export async function identificarCandidatos(textos: string[], idioma: Idioma, or
       continue
     }
 
-    if (achado.pontuacao === 1) {
-      const tipoLido = textos.slice(indice + 1).some((linha) =>
-        achado.tipos.some((tipo) => normalizar(linha) === normalizar(tipo)),
-      )
-      if (indice === 0) {
-        const tituloComposto = (limpo.match(/\p{L}+/gu) ?? []).length > 1 && normalizar(limpo).length >= 8
-        return { nomes: achado.nomes.slice(0, 1), certeza: tipoLido || tituloIsolado || tituloComposto }
-      }
-      return { nomes: [...new Set([...nomes, ...achado.nomes])].slice(0, 3), certeza: false }
-    }
-    if (achado.pontuacao >= SEMELHANCA_PARA_CONFIRMAR) achado.nomes.forEach(guardar)
+    if (achado.pontuacao < SEMELHANCA_PARA_CONFIRMAR || achado.ambigua) continue
+    const tipoLido = textos.slice(indice + 1).some((linha) =>
+      achado.tipos.some((tipo) => semelhanca(linha, tipo) >= 0.87),
+    )
+    const tituloComposto = (limpo.match(/\p{L}+/gu) ?? []).length > 1 && normalizar(limpo).length >= 8
+    const tituloExato = indice === 0 && achado.pontuacao === 1 && (tituloIsolado || tituloComposto)
+    if (tipoLido || tituloExato) return { nomes: achado.nomes.slice(0, 1), certeza: true }
+    if (indice === 0 && tituloIsolado && achado.pontuacao >= 0.82) tituloProvavel = achado.nomes[0]
+    achado.nomes.forEach(guardar)
   }
 
   if (origem === 'voz' && nomes.length > 0 && nomes.length < 3) {
@@ -304,5 +306,5 @@ export async function identificarCandidatos(textos: string[], idioma: Idioma, or
       return { nomes, certeza: false }
     }
   }
-  return { nomes: nomes.slice(0, 3), certeza: false }
+  return { nomes: nomes.slice(0, 3), certeza: false, tituloProvavel }
 }

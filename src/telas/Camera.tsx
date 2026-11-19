@@ -26,15 +26,16 @@ async function identificarImagem(
   aoProgredir: (porcentagem: number) => void,
   estaAtivo: () => boolean,
   usarNuvem: boolean,
+  semCorrecaoDeInclinacao = false,
 ) {
   let imagem: HTMLCanvasElement | undefined
   const quadro = () => estaAtivo() ? (imagem ??= obterImagem()) : null
-  const linhas = await lerLinhas(quadro, idioma, aoProgredir, true, true, usarNuvem)
+  const linhas = await lerLinhas(quadro, idioma, aoProgredir, !semCorrecaoDeInclinacao, true, usarNuvem)
   if (!estaAtivo()) return
   const resultado = await identificarCandidatos(linhas.map((linha) => linha.texto), idioma, 'camera', linhas[0]?.tituloIsolado)
   if (!estaAtivo() || resultado.certeza || !linhas[0]?.tituloIsolado) return resultado
 
-  const quadroInteiro = await lerLinhas(quadro, idioma, aoProgredir, true, false)
+  const quadroInteiro = await lerLinhas(quadro, idioma, aoProgredir, false, false)
   if (!estaAtivo()) return
   const segundaLeitura = await identificarCandidatos(quadroInteiro.map((linha) => linha.texto), idioma, 'camera')
   return segundaLeitura.certeza || !resultado.nomes.length ? segundaLeitura : resultado
@@ -117,6 +118,7 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
     }
     let ativo = true
     let rodadas = 0
+    let tituloAnterior: string | undefined
 
     async function procurarSemParar() {
       while (ativo) {
@@ -134,11 +136,15 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
             },
             () => ativo && !document.hidden,
             usarNuvem,
+            rodadas % 2 === 1,
           )
           if (!ativo) return
           if (!resultado || document.hidden) continue
-          if (resultado.certeza) {
-            const carta = await buscarCarta(resultado.nomes[0], preferencias.idioma)
+          const tituloRepetido = resultado.tituloProvavel && resultado.tituloProvavel === tituloAnterior
+          const nome = resultado.certeza ? resultado.nomes[0] : tituloRepetido ? resultado.tituloProvavel : undefined
+          tituloAnterior = resultado.tituloProvavel
+          if (nome) {
+            const carta = await buscarCarta(nome, preferencias.idioma)
             if (ativo) {
               vibrar()
               abrirRef.current(carta)
