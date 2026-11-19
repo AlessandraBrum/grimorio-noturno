@@ -1,6 +1,6 @@
 import { conferirAcessibilidade } from './apoio/acessibilidade'
 import { FOTO_DA_CARTA, semCamera, semVozNoNavegador, simularLeitorDeTexto, simularVoz } from './apoio/entradas-falsas'
-import { expect, test } from './apoio/scryfall-falso'
+import { CARTA_FALSA, expect, test } from './apoio/scryfall-falso'
 
 const LEITURA_DUVIDOSA = 'xx midnight owl zzzz qqqq wwww'
 
@@ -65,6 +65,7 @@ test.describe('Escanear com a câmera', () => {
           contexto.fillStyle = 'black'
           contexto.font = 'bold 48px Arial'
           contexto.fillText('Midnight Owl', 20, 60)
+          contexto.fillText('Creature - Bird', 20, 370)
           contexto.restore()
           requestAnimationFrame(desenhar)
         }
@@ -106,13 +107,54 @@ test.describe('Escanear com a câmera', () => {
 
   test('leitura duvidosa pergunta antes e "Não, tentar de novo" volta para a câmera', async ({ page }) => {
     await semCamera(page)
-    await simularLeitorDeTexto(page, LEITURA_DUVIDOSA)
+    await simularLeitorDeTexto(page, 'Midnight Owl zz')
     await page.goto('/#camera')
     await page.locator('input[type="file"]').setInputFiles(FOTO_DA_CARTA)
     await expect(page.getByRole('heading', { name: 'É esta carta?' })).toBeFocused()
     await conferirAcessibilidade(page)
     await page.getByRole('button', { name: 'Não, tentar de novo' }).click()
     await expect(page.getByRole('button', { name: 'Escolher uma foto' })).toBeVisible()
+  })
+
+  test('uma palavra das regras sem o tipo correspondente exige confirmação', async ({ page }) => {
+    await semCamera(page)
+    await simularLeitorDeTexto(page, 'Lifelink\nCreature - Human Cleric')
+    await page.route('https://api.scryfall.com/cards/named?fuzzy=Lifelink', (rota) => rota.fulfill({
+      json: { ...CARTA_FALSA, name: 'Lifelink', type_line: 'Enchantment — Aura' },
+    }))
+    await page.goto('/#camera')
+    await page.locator('input[type="file"]').setInputFiles(FOTO_DA_CARTA)
+    await expect(page.getByRole('heading', { name: 'É esta carta?' })).toBeFocused()
+    await expect(page.getByRole('heading', { level: 1, name: 'Escanear carta' })).toBeVisible()
+  })
+
+  test('descarta um token sem relação com Acidic Slime', async ({ page }) => {
+    await semCamera(page)
+    await simularLeitorDeTexto(page, 'Acidic Slim\nCreature - Ooze')
+    await page.route(/\/cards\/named\?fuzzy=Acidic/, (rota) => rota.fulfill({
+      json: { ...CARTA_FALSA, name: 'Forest', type_line: 'Token Land' },
+    }))
+    await page.goto('/#camera')
+    await page.locator('input[type="file"]').setInputFiles(FOTO_DA_CARTA)
+    await expect(page.getByRole('status').filter({ hasText: 'Não consegui ler o nome' })).toBeVisible()
+  })
+
+  test('reconhece o nome e o tipo da face visível de Liliana', async ({ page }) => {
+    await semCamera(page)
+    await simularLeitorDeTexto(page, 'Liliana, Heretical Healer\nLegendary Creature - Human Cleric\nLifelink')
+    await page.route(/\/cards\/named\?fuzzy=Liliana/, (rota) => rota.fulfill({
+      json: {
+        ...CARTA_FALSA,
+        name: 'Liliana, Heretical Healer // Liliana, Defiant Necromancer',
+        card_faces: [
+          { name: 'Liliana, Heretical Healer', type_line: 'Legendary Creature — Human Cleric' },
+          { name: 'Liliana, Defiant Necromancer', type_line: 'Legendary Planeswalker — Liliana' },
+        ],
+      },
+    }))
+    await page.goto('/#camera')
+    await page.locator('input[type="file"]').setInputFiles(FOTO_DA_CARTA)
+    await expect(page.getByRole('heading', { level: 1, name: /Liliana, Heretical Healer/ })).toBeVisible()
   })
 
   test('avisa quando não consegue ler o nome', async ({ page }) => {

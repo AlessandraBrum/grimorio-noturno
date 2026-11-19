@@ -23,7 +23,6 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
   const [estado, setEstado] = useState<Estado>('abrindo')
   const [mensagem, setMensagem] = useState(t.camera.abrindo)
   const [candidatos, setCandidatos] = useState<string[]>([])
-  const [sugestoes, setSugestoes] = useState<string[]>([])
   const [temCamera, setTemCamera] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
   const fotoRef = useRef<HTMLInputElement>(null)
@@ -79,6 +78,11 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
 
   useEffect(() => {
     if (estado !== 'procurando') return
+    const video = videoRef.current
+    if (video && fluxoRef.current && video.srcObject !== fluxoRef.current) {
+      video.srcObject = fluxoRef.current
+      void video.play().catch(() => {})
+    }
     let ativo = true
     let rodadas = 0
 
@@ -104,7 +108,7 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
           )
           if (!ativo) return
           if (linhas.length > 0) {
-            const { nomes, certeza } = await identificarCandidatos(linhas.map((linha) => linha.texto), preferencias.idioma)
+            const { nomes, certeza } = await identificarCandidatos(linhas.map((linha) => linha.texto), preferencias.idioma, 'camera')
             if (!ativo) return
             if (certeza) {
               vibrar()
@@ -113,7 +117,11 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
               if (ativo) abrirRef.current(carta)
               return
             }
-            if (nomes.length > 0) setSugestoes(nomes)
+            if (nomes.length > 0) {
+              setCandidatos(nomes)
+              setEstado('confirmar')
+              return
+            }
           }
           rodadas += 1
           setMensagem(rodadas >= RODADAS_ATE_A_DICA ? t.camera.dica : t.camera.procurandoNome)
@@ -149,7 +157,7 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
         if (!sessao?.aborted && porcentagem < 100) setMensagem(t.camera.baixando(porcentagem))
       }, true)
       if (sessao?.aborted) return
-      const { nomes, certeza } = await identificarCandidatos(linhas.map((linha) => linha.texto), preferencias.idioma)
+      const { nomes, certeza } = await identificarCandidatos(linhas.map((linha) => linha.texto), preferencias.idioma, 'camera')
       if (sessao?.aborted) return
       if (certeza) {
         const carta = await buscarCarta(nomes[0], preferencias.idioma)
@@ -168,16 +176,6 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
       if (sessao?.aborted) return
       setEstado(erro instanceof SemConexao ? 'erro' : anterior)
       setMensagem(erro instanceof SemConexao ? t.buscar.semInternet : t.camera.naoLi)
-    }
-  }
-
-  async function abrirSugestao(nome: string) {
-    const sessao = sessaoRef.current?.signal
-    try {
-      const carta = await buscarCarta(nome, preferencias.idioma)
-      if (!sessao?.aborted) aoAbrir(carta)
-    } catch {
-      setMensagem(t.entrada.naoAchei)
     }
   }
 
@@ -211,21 +209,6 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
           <p role="status" aria-live="polite" className={comAviso ? 'aviso erro' : 'legenda camera__status'}>
             {mensagem}
           </p>
-
-          {sugestoes.length > 0 && estado === 'procurando' && (
-            <div className="confirmar__outros">
-              <p className="legenda">{t.entrada.talvez}</p>
-              <ul className="lista-chips">
-                {sugestoes.map((nome) => (
-                  <li key={nome}>
-                    <button type="button" className="chip" lang="en" onClick={() => abrirSugestao(nome)}>
-                      {nome}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
 
           <div className="camera__acoes">
             <button

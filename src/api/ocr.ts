@@ -54,6 +54,7 @@ export function prepararImagem(origem: CanvasImageSource, largura: number, altur
 
 function limparLinha(linha: string) {
   return linha
+    .replace(/\{[^{}]+\}/g, ' ')
     .split(/\s+/)
     .map((palavra) => palavra.replace(/^[^\p{L}]+|[^\p{L}',-]+$/gu, ''))
     .filter((palavra) => /\p{L}/u.test(palavra))

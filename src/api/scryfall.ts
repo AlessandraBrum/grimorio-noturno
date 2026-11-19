@@ -178,6 +178,7 @@ function semelhanca(a: string, b: string) {
 }
 
 const SEMELHANCA_SEGURA = 0.6
+const SEMELHANCA_PARA_CONFIRMAR = 0.75
 
 export interface Identificacao {
   nomes: string[]
@@ -186,7 +187,8 @@ export interface Identificacao {
 
 interface Achado {
   nomes: string[]
-  certeza: boolean
+  pontuacao: number
+  tipos: string[]
 }
 
 const jaProcurados = new Map<string, Achado>()
@@ -199,19 +201,33 @@ async function buscarPorTexto(texto: string, idioma: Idioma) {
   return lista.data.filter((carta) => carta.lang === idioma)
 }
 
+function avaliarNome(texto: string, carta: CartaScryfall, idioma: Idioma) {
+  const local = idioma === carta.lang
+  const faces = carta.card_faces ?? []
+  const nomes = [carta.name, ...faces.map((face) => face.name)]
+  if (local) {
+    nomes.push(carta.printed_name ?? '', ...faces.map((face) => face.printed_name ?? ''))
+  }
+  return Math.max(...nomes.map((nome) => semelhanca(texto, nome)))
+}
+
+function tiposDaCarta(carta: CartaScryfall, idioma: Idioma) {
+  return [carta, ...(carta.card_faces ?? [])]
+    .flatMap((face) => [face.type_line, idioma === carta.lang ? face.printed_type_line : undefined])
+    .filter((tipo): tipo is string => !!tipo)
+}
+
 async function procurarTexto(texto: string, idioma: Idioma): Promise<Achado> {
   const chave = idioma + ':' + normalizar(texto)
   const guardado = jaProcurados.get(chave)
   if (guardado) return guardado
 
-  let achado: Achado = { nomes: [], certeza: false }
+  let achado: Achado = { nomes: [], pontuacao: 0, tipos: [] }
   try {
     const carta = (idioma === 'pt' ? await buscarNomeExato(texto, idioma) : undefined)
       ?? await pedir<CartaScryfall>(`/cards/named?fuzzy=${encodeURIComponent(texto)}`)
-    const impresso = idioma === carta.lang ? carta.printed_name ?? carta.card_faces?.[0]?.printed_name : undefined
     cartasIdentificadas.set(idioma + ':' + carta.name.toLowerCase(), carta)
-    const pontuacao = Math.max(semelhanca(texto, carta.name), semelhanca(texto, impresso ?? ''))
-    achado = { nomes: [carta.name], certeza: pontuacao >= SEMELHANCA_SEGURA }
+    achado = { nomes: [carta.name], pontuacao: avaliarNome(texto, carta, idioma), tipos: tiposDaCarta(carta, idioma) }
   } catch (erro) {
     if (!(erro instanceof CartaNaoEncontrada)) throw erro
     try {
@@ -222,10 +238,8 @@ async function procurarTexto(texto: string, idioma: Idioma): Promise<Achado> {
       const primeira = encontradas[0]
       achado = {
         nomes: encontradas.map((carta) => carta.name),
-        certeza:
-          encontradas.length === 1 &&
-          !!primeira &&
-          semelhanca(texto, primeira.printed_name ?? primeira.name) >= SEMELHANCA_SEGURA,
+        pontuacao: primeira && encontradas.length === 1 ? avaliarNome(texto, primeira, idioma) : 0,
+        tipos: primeira ? tiposDaCarta(primeira, idioma) : [],
       }
     } catch (erroBusca) {
       if (!(erroBusca instanceof CartaNaoEncontrada)) throw erroBusca
@@ -235,21 +249,33 @@ async function procurarTexto(texto: string, idioma: Idioma): Promise<Achado> {
   return achado
 }
 
-export async function identificarCandidatos(textos: string[], idioma: Idioma): Promise<Identificacao> {
+export async function identificarCandidatos(textos: string[], idioma: Idioma, origem: 'voz' | 'camera' = 'voz'): Promise<Identificacao> {
   const nomes: string[] = []
   const guardar = (nome: string) => {
     if (!nomes.includes(nome)) nomes.push(nome)
   }
 
-  for (const texto of textos.slice(0, 4)) {
+  for (const [indice, texto] of textos.slice(0, 4).entries()) {
     const limpo = texto.trim()
     if (limpo.length < 3) continue
     const achado = await procurarTexto(limpo, idioma)
-    if (achado.certeza) return { nomes: achado.nomes.slice(0, 1), certeza: true }
-    achado.nomes.forEach(guardar)
+    if (origem === 'voz') {
+      if (achado.pontuacao >= SEMELHANCA_SEGURA) return { nomes: achado.nomes.slice(0, 1), certeza: true }
+      achado.nomes.forEach(guardar)
+      continue
+    }
+
+    if (achado.pontuacao === 1) {
+      const tipoLido = textos.slice(indice + 1).some((linha) =>
+        achado.tipos.some((tipo) => normalizar(linha) === normalizar(tipo)),
+      )
+      if (indice === 0) return { nomes: achado.nomes, certeza: tipoLido }
+      return { nomes: [...new Set([...nomes, ...achado.nomes])].slice(0, 3), certeza: false }
+    }
+    if (achado.pontuacao >= SEMELHANCA_PARA_CONFIRMAR) achado.nomes.forEach(guardar)
   }
 
-  if (nomes.length > 0 && nomes.length < 3) {
+  if (origem === 'voz' && nomes.length > 0 && nomes.length < 3) {
     try {
       ;(await sugerirNomes(nomes[0].split(' ')[0])).forEach((nome) => {
         if (nomes.length < 3) guardar(nome)

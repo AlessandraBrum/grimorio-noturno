@@ -61,7 +61,7 @@ Para respeitar as regras do Scryfall, o app espera pelo menos 100 ms entre um pe
 
 Ao abrir a câmera, o Grimório prepara apenas o modelo do idioma selecionado (português ou inglês). A leitura com Tesseract.js usa o quadro inteiro, com uma imagem menor na maioria das tentativas. Periodicamente, tenta de novo com mais resolução e correção de inclinação. O reconhecimento acontece no aparelho, e o aplicativo envia ao Scryfall apenas os nomes candidatos.
 
-Na busca escrita, digite o nome exato ou escolha uma das sugestões. Na câmera, quando o nome corresponde com confiança, a ficha abre automaticamente. Leituras duvidosas podem gerar sugestões. Se o Scryfall não tiver o texto completo em português, a ficha avisa e usa o conteúdo em inglês.
+Na busca escrita, digite o nome exato ou escolha uma das sugestões. Na câmera, a ficha abre automaticamente quando o nome e o tipo da carta correspondem à leitura. Se o nome for plausível e a leitura estiver incompleta, o app pede confirmação. Se o Scryfall não tiver o texto completo em português, a ficha avisa e usa o conteúdo em inglês.
 
 Antes disso, a versão 2 vai permitir falar o nome da carta, usando o reconhecimento de voz do navegador.
 
