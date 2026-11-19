@@ -46,6 +46,7 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
   const [estado, setEstado] = useState<Estado>('abrindo')
   const [mensagem, setMensagem] = useState(t.camera.abrindo)
   const [temCamera, setTemCamera] = useState(false)
+  const [lendoQuadros, setLendoQuadros] = useState(false)
   const [buscandoPorVoz, setBuscandoPorVoz] = useState(false)
   const [nuvemDisponivel, setNuvemDisponivel] = useState(false)
   const usarNuvem = nuvemDisponivel && preferencias.ocrNuvem === true
@@ -96,7 +97,7 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
         void videoRef.current.play().catch(() => {})
       }
       setEstado('procurando')
-      setMensagem(t.camera.procurandoNome)
+      setMensagem(t.camera.esperandoImagem)
     }
     abrir().catch(() => {
       if (!ativo) return
@@ -117,6 +118,7 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
       void video.play().catch(() => {})
     }
     let ativo = true
+    let recebeuQuadro = false
     let rodadas = 0
     let tituloAnterior: string | undefined
 
@@ -129,7 +131,14 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
         }
         try {
           const resultado = await identificarImagem(
-            () => prepararImagem(video, video.videoWidth, video.videoHeight, LADO_DO_QUADRO),
+            () => {
+              if (!recebeuQuadro) {
+                recebeuQuadro = true
+                setLendoQuadros(true)
+                setMensagem(t.camera.procurandoNome)
+              }
+              return prepararImagem(video, video.videoWidth, video.videoHeight, LADO_DO_QUADRO)
+            },
             preferencias.idioma,
             (porcentagem) => {
               if (ativo && porcentagem < 100) setMensagem(t.camera.baixando(porcentagem))
@@ -144,6 +153,7 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
           const nome = resultado.certeza ? resultado.nomes[0] : tituloRepetido ? resultado.tituloProvavel : undefined
           tituloAnterior = resultado.tituloProvavel
           if (nome) {
+            setMensagem(t.camera.carregandoFicha)
             const carta = await buscarCarta(nome, preferencias.idioma)
             if (ativo) {
               vibrar()
@@ -156,8 +166,12 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
           await esperar(60)
         } catch (erro) {
           if (!ativo) return
-          setMensagem(erro instanceof SemConexao ? t.buscar.semInternet
-            : erro instanceof ServicoDeCartasIndisponivel ? t.buscar.servicoIndisponivel : t.camera.dica)
+          if (erro instanceof ServicoDeCartasIndisponivel) {
+            const codigo = erro.status ? ' (HTTP ' + erro.status + ')' : ''
+            setMensagem(t.buscar.servicoIndisponivel + codigo)
+          } else {
+            setMensagem(erro instanceof SemConexao ? t.buscar.semInternet : t.camera.dica)
+          }
           await esperar(3000)
         }
       }
@@ -186,6 +200,7 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
   async function lerImagem(obterImagem: () => HTMLCanvasElement | Promise<HTMLCanvasElement>) {
     const sessao = sessaoRef.current?.signal
     const anterior = estado
+    setLendoQuadros(false)
     setEstado('lendo-foto')
     setMensagem(t.camera.lendo)
     try {
@@ -218,6 +233,7 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
     }
   }
 
+  const indicadorAtivo = !buscandoPorVoz && (estado === 'abrindo' || estado === 'procurando' || estado === 'lendo-foto')
   const comAviso = estado === 'erro' || estado === 'sem-camera'
 
   return (
@@ -230,15 +246,22 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
       </div>
 
       <section className="camera" aria-label={t.camera.titulo}>
+        <div className={comAviso ? 'aviso erro' : 'camera__status'} role="status">
+          {indicadorAtivo && <span className="camera__indicador" aria-hidden="true" />}
+          <div>
+            {estado === 'procurando' && lendoQuadros && !buscandoPorVoz && (
+              <strong>{t.camera.leituraAtiva}</strong>
+            )}
+            <p>{buscandoPorVoz ? t.camera.pausadaPorVoz : mensagem}</p>
+          </div>
+        </div>
         <div className={temCamera ? 'camera__moldura' : 'camera__moldura camera__moldura--vazia'}>
-          <video ref={videoRef} className="camera__video" playsInline muted aria-label={t.camera.video} hidden={!temCamera} />
+          <video ref={videoRef} className="camera__video" autoPlay playsInline muted aria-label={t.camera.video} hidden={!temCamera} />
           {temCamera && <div className="camera__mira" aria-hidden="true" />}
           {!temCamera && <Icone nome="camera" tamanho={48} className="camera__icone" />}
         </div>
 
-        <p role="status" aria-live="polite" className={comAviso ? 'aviso erro' : 'legenda camera__status'}>
-          {buscandoPorVoz ? '' : mensagem}
-        </p>
+
 
         <div className="camera__acoes">
           <button

@@ -81,6 +81,7 @@ test.describe('Escanear com a câmera', () => {
       if (request.url().endsWith('.traineddata.gz')) modelos.push(new URL(request.url()).pathname)
     })
     await page.goto('/#camera')
+    await expect(page.getByRole('status').filter({ hasText: 'Leitura automática ativa' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Capturar quadro e ler' })).toHaveCount(0)
     await expect(page.getByRole('heading', { level: 1, name: 'Midnight Owl' })).toBeVisible({ timeout: 15_000 })
     expect(modelos).toEqual(['/leitor/por.traineddata.gz'])

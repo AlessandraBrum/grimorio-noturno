@@ -759,6 +759,31 @@ body::before {
   gap: var(--espaco-4);
 }
 
+.camera__status {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--espaco-3);
+  padding: var(--espaco-3) var(--espaco-4);
+  border: 1px solid var(--rosa);
+  border-radius: var(--raio-sm);
+  background: var(--veu);
+  color: var(--tinta);
+}
+
+.camera__status p {
+  margin: 0;
+}
+
+.camera__indicador {
+  flex: none;
+  width: 0.75em;
+  height: 0.75em;
+  margin-top: 0.4em;
+  border-radius: 50%;
+  background: var(--rosa);
+  box-shadow: var(--brilho-hover);
+}
+
 .camera__moldura {
   position: relative;
   width: 100%;

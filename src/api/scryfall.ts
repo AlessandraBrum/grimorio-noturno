@@ -2,12 +2,20 @@ import type { Card, Idioma } from '../types/card'
 
 const BASE = 'https://api.scryfall.com'
 const INTERVALO_MINIMO_MS = 100
+const LIMITE_DE_CONSULTA_MS = 3500
 
 let ultimaRequisicao = 0
 
 export class CartaNaoEncontrada extends Error {}
 export class SemConexao extends Error {}
-export class ServicoDeCartasIndisponivel extends Error {}
+export class ServicoDeCartasIndisponivel extends Error {
+  readonly status?: number
+
+  constructor(status?: number) {
+    super()
+    this.status = status
+  }
+}
 
 async function esperarVez() {
   const agora = Date.now()
@@ -18,28 +26,44 @@ async function esperarVez() {
   }
 }
 
+async function consultar(caminho: string, sinal?: AbortSignal) {
+  const controle = new AbortController()
+  const abortar = () => controle.abort()
+  const limite = setTimeout(abortar, LIMITE_DE_CONSULTA_MS)
+  sinal?.addEventListener('abort', abortar, { once: true })
+  try {
+    if (sinal?.aborted) abortar()
+    return await fetch(BASE + caminho, {
+      headers: { Accept: 'application/json' },
+      signal: controle.signal,
+    })
+  } finally {
+    clearTimeout(limite)
+    sinal?.removeEventListener('abort', abortar)
+  }
+}
+
 async function pedir<T>(caminho: string, sinal?: AbortSignal): Promise<T> {
   await esperarVez()
-  const opcoes = { headers: { Accept: 'application/json' }, signal: sinal }
   let resposta: Response
   try {
-    resposta = await fetch(BASE + caminho, opcoes)
+    resposta = await consultar(caminho, sinal)
   } catch {
     sinal?.throwIfAborted()
     if (!navigator.onLine) throw new SemConexao()
     try {
       await esperarVez()
       sinal?.throwIfAborted()
-      resposta = await fetch(BASE + caminho, opcoes)
+      resposta = await consultar(caminho, sinal)
     } catch {
       sinal?.throwIfAborted()
       if (!navigator.onLine) throw new SemConexao()
       throw new ServicoDeCartasIndisponivel()
     }
   }
-  if (!resposta.headers.get('content-type')?.includes('application/json')) throw new ServicoDeCartasIndisponivel()
+  if (!resposta.headers.get('content-type')?.includes('application/json')) throw new ServicoDeCartasIndisponivel(resposta.status)
   if (resposta.status === 404) throw new CartaNaoEncontrada()
-  if (!resposta.ok) throw new ServicoDeCartasIndisponivel()
+  if (!resposta.ok) throw new ServicoDeCartasIndisponivel(resposta.status)
   return resposta.json() as Promise<T>
 }
 
