@@ -14,6 +14,7 @@
   --foco: #ff8fa6;
   --veu-fundo: rgba(5, 2, 6, 0.72);
   --brilho: 0 0 0 1px rgba(224, 38, 63, 0.55), 0 0 22px rgba(224, 38, 63, 0.35);
+  --brilho-hover: 0 0 0 1px var(--rosa), 0 0 18px rgb(255 95 143 / 45%);
   --sombra-folha: -8px 0 28px rgba(0, 0, 0, 0.6);
   color-scheme: dark;
 }
@@ -33,6 +34,7 @@
   --foco: #4a0820;
   --veu-fundo: rgba(26, 11, 22, 0.55);
   --brilho: 0 0 0 1px rgba(160, 24, 47, 0.6), 0 0 14px rgba(160, 24, 47, 0.25);
+  --brilho-hover: 0 0 0 1px var(--rosa), 0 0 16px rgb(185 31 89 / 38%);
   --sombra-folha: -8px 0 24px rgba(26, 11, 22, 0.3);
   color-scheme: light;
 }

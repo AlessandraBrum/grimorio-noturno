@@ -850,11 +850,6 @@ body::before {
   .player__principal:hover,
   .botao-entrada--ativo:hover {
     background: color-mix(in srgb, var(--vinho) 75%, #000);
-    box-shadow: 0 0 0 2px var(--lua);
-  }
-
-  .botao-entrada:hover:not(:disabled) {
-    box-shadow: 0 0 0 1px var(--rosa), 0 0 18px rgb(255 95 143 / 45%);
   }
 
   .player__som[aria-pressed="true"]:hover {
@@ -864,6 +859,11 @@ body::before {
 
   .navegacao__link:hover {
     color: var(--tinta);
+  }
+
+  :is(button, summary, .botao-entrada, .botao-link, .botao-principal, .botao-secundario, .chip, .navegacao__link, .link-acao, .busca__opcao):hover:not(:disabled):not([aria-disabled="true"]),
+  .opcao input:not(:disabled) + .opcao__caixa:hover {
+    box-shadow: var(--brilho-hover);
   }
 }
 
