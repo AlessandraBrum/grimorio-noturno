@@ -166,7 +166,6 @@ export async function lerLinhas(
   idioma: Idioma,
   aoProgredir: (porcentagem: number) => void,
   corrigirInclinacao = false,
-  quadroAoVivo = false,
   priorizarTitulo = true,
 ): Promise<LinhaLida[]> {
   progresso.set(idioma, aoProgredir)
@@ -185,10 +184,7 @@ export async function lerLinhas(
       return [{ texto, topo: 0, tituloIsolado: true }]
     }
   }
-  const jpeg = quadroAoVivo && await new Promise<Blob | null>((resolve) => {
-    imagem.toBlob(resolve, 'image/jpeg', 0.92)
-  })
-  const { data } = await tesseract.recognize(jpeg || imagem, { rotateAuto: corrigirInclinacao }, { blocks: true, text: true })
+  const { data } = await tesseract.recognize(imagem, { rotateAuto: corrigirInclinacao }, { blocks: true, text: true })
   const linhas = (data.blocks ?? []).flatMap((bloco) =>
     bloco.paragraphs.flatMap((paragrafo) => paragrafo.lines),
   )

@@ -4,11 +4,12 @@ import { buscarCarta, identificarCandidatos, SemConexao, ServicoDeCartasIndispon
 import { ConfirmarCarta } from '../components/ConfirmarCarta'
 import { Icone } from '../components/Icone'
 import { usePreferencias } from '../contexto/usePreferencias'
-import type { Card } from '../types/card'
+import type { Card, Idioma } from '../types/card'
 
 type Estado = 'abrindo' | 'procurando' | 'sem-camera' | 'lendo-foto' | 'confirmar' | 'erro'
 
 const RODADAS_ATE_A_DICA = 4
+const LADO_DO_QUADRO = 1920
 
 function esperar(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -16,6 +17,25 @@ function esperar(ms: number) {
 
 function vibrar() {
   if ('vibrate' in navigator) navigator.vibrate(150)
+}
+
+async function identificarImagem(
+  obterImagem: () => HTMLCanvasElement,
+  idioma: Idioma,
+  aoProgredir: (porcentagem: number) => void,
+  estaAtivo: () => boolean,
+) {
+  let imagem: HTMLCanvasElement | undefined
+  const quadro = () => estaAtivo() ? (imagem ??= obterImagem()) : null
+  const linhas = await lerLinhas(quadro, idioma, aoProgredir, true)
+  if (!estaAtivo()) return
+  const resultado = await identificarCandidatos(linhas.map((linha) => linha.texto), idioma, 'camera', linhas[0]?.tituloIsolado)
+  if (!estaAtivo() || resultado.certeza || !linhas[0]?.tituloIsolado) return resultado
+
+  const quadroInteiro = await lerLinhas(quadro, idioma, aoProgredir, true, false)
+  if (!estaAtivo()) return
+  const segundaLeitura = await identificarCandidatos(quadroInteiro.map((linha) => linha.texto), idioma, 'camera')
+  return segundaLeitura.certeza || !resultado.nomes.length ? segundaLeitura : resultado
 }
 
 export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
@@ -85,6 +105,7 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
     }
     let ativo = true
     let rodadas = 0
+    let candidatoAnterior: string | undefined
 
     async function procurarSemParar() {
       while (ativo) {
@@ -94,38 +115,33 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
           continue
         }
         try {
-          const maisDetalhe = rodadas % 2 === 1
-          const linhas = await lerLinhas(
-            () => ativo && !document.hidden
-              ? prepararImagem(video, video.videoWidth, video.videoHeight, maisDetalhe ? 1920 : undefined)
-              : null,
+          const resultado = await identificarImagem(
+            () => prepararImagem(video, video.videoWidth, video.videoHeight, LADO_DO_QUADRO),
             preferencias.idioma,
             (porcentagem) => {
               if (ativo && porcentagem < 100) setMensagem(t.camera.baixando(porcentagem))
             },
-            maisDetalhe,
-            true,
-            !maisDetalhe,
+            () => ativo && !document.hidden,
           )
           if (!ativo) return
-          if (linhas.length > 0) {
-            const { nomes, certeza } = await identificarCandidatos(linhas.map((linha) => linha.texto), preferencias.idioma, 'camera', linhas[0]?.tituloIsolado)
-            if (!ativo) return
-            if (certeza) {
-              const carta = await buscarCarta(nomes[0], preferencias.idioma)
-              if (ativo) {
-                vibrar()
-                abrirRef.current(carta)
-              }
-              return
-            }
-            if (nomes.length > 0) {
+          if (!resultado || document.hidden) continue
+          if (resultado.certeza) {
+            const carta = await buscarCarta(resultado.nomes[0], preferencias.idioma)
+            if (ativo) {
               vibrar()
-              setCandidatos(nomes)
+              abrirRef.current(carta)
+            }
+            return
+          }
+          if (resultado.nomes.length > 0) {
+            if (resultado.nomes[0] === candidatoAnterior) {
+              vibrar()
+              setCandidatos(resultado.nomes)
               setEstado('confirmar')
               return
             }
           }
+          candidatoAnterior = resultado.nomes[0]
           rodadas += 1
           setMensagem(rodadas >= RODADAS_ATE_A_DICA ? t.camera.dica : t.camera.procurandoNome)
           await esperar(60)
@@ -151,7 +167,7 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
     await lerImagem(async () => {
       const bitmap = await createImageBitmap(arquivo)
       try {
-        return prepararImagem(bitmap, bitmap.width, bitmap.height, 1920)
+        return prepararImagem(bitmap, bitmap.width, bitmap.height, LADO_DO_QUADRO)
       } finally {
         bitmap.close()
       }
@@ -161,7 +177,7 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
   function capturar() {
     const video = videoRef.current
     if (!video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return
-    void lerImagem(() => prepararImagem(video, video.videoWidth, video.videoHeight, 1920))
+    void lerImagem(() => prepararImagem(video, video.videoWidth, video.videoHeight, LADO_DO_QUADRO))
   }
 
   async function lerImagem(obterImagem: () => HTMLCanvasElement | Promise<HTMLCanvasElement>) {
@@ -172,19 +188,16 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
     try {
       const imagem = await obterImagem()
       if (sessao?.aborted) return
-      const linhas = await lerLinhas(() => sessao?.aborted ? null : imagem, preferencias.idioma, (porcentagem) => {
-        if (!sessao?.aborted && porcentagem < 100) setMensagem(t.camera.baixando(porcentagem))
-      }, true)
-      if (sessao?.aborted) return
-      let resultado = await identificarCandidatos(linhas.map((linha) => linha.texto), preferencias.idioma, 'camera', linhas[0]?.tituloIsolado)
-      if (!resultado.certeza && linhas[0]?.tituloIsolado && !sessao?.aborted) {
-        const quadroInteiro = await lerLinhas(() => sessao?.aborted ? null : imagem, preferencias.idioma, () => {}, true, false, false)
-        if (sessao?.aborted) return
-        const segundaLeitura = await identificarCandidatos(quadroInteiro.map((linha) => linha.texto), preferencias.idioma, 'camera')
-        if (segundaLeitura.certeza || !resultado.nomes.length) resultado = segundaLeitura
-      }
+      const resultado = await identificarImagem(
+        () => imagem,
+        preferencias.idioma,
+        (porcentagem) => {
+          if (!sessao?.aborted && porcentagem < 100) setMensagem(t.camera.baixando(porcentagem))
+        },
+        () => !sessao?.aborted,
+      )
+      if (!resultado || sessao?.aborted) return
       const { nomes, certeza } = resultado
-      if (sessao?.aborted) return
       if (certeza) {
         const carta = await buscarCarta(nomes[0], preferencias.idioma)
         if (!sessao?.aborted) aoAbrir(carta)
@@ -196,12 +209,12 @@ export function Camera({ aoAbrir }: { aoAbrir: (carta: Card) => void }) {
         setMensagem('')
         return
       }
-      setEstado('erro')
+      setEstado(temCamera ? 'procurando' : 'erro')
       setMensagem(t.camera.naoLi)
     } catch (erro) {
       if (sessao?.aborted) return
       const falhaDeBusca = erro instanceof SemConexao || erro instanceof ServicoDeCartasIndisponivel
-      setEstado(falhaDeBusca ? 'erro' : anterior)
+      setEstado(temCamera ? 'procurando' : falhaDeBusca ? 'erro' : anterior)
       setMensagem(erro instanceof SemConexao ? t.buscar.semInternet
         : erro instanceof ServicoDeCartasIndisponivel ? t.buscar.servicoIndisponivel : t.camera.naoLi)
     }
