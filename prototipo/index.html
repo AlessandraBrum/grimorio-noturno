@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="pt-BR" data-paleta="floresta">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Buscar carta · Mana Vai</title>
+  <meta name="description" content="Protótipo do Mana Vai: leia cartas de Magic com voz, letra grande e contraste alto.">
+  <meta name="theme-color" content="#151918">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:ital,wght@0,400;0,600;0,800;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="estilos.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="pular" href="#conteudo" data-t="pular">Pular para o conteúdo</a>
+
+  <header class="barra-topo">
+    <button class="botao-icone" type="button" id="voltar" hidden>
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+      <span class="sr-only" data-t="voltar">Voltar</span>
+    </button>
+    <p class="marca"><span aria-hidden="true" class="marca-gota"></span>Mana Vai</p>
+    <button class="botao-idioma" type="button" id="abrir-idioma" aria-haspopup="dialog">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg>
+      <span id="idioma-atual">PT</span>
+      <span class="sr-only" data-t="trocarIdioma">Trocar idioma</span>
+    </button>
+  </header>
+
+  <main id="conteudo" tabindex="-1">
+
+    <section class="tela" id="tela-buscar" data-rota="buscar" aria-labelledby="t-buscar">
+      <h1 id="t-buscar" class="titulo-tela" data-t="buscarTitulo">Qual carta você quer ler?</h1>
+
+      <form class="busca" id="form-busca" role="search" autocomplete="off">
+        <label for="campo-busca" class="rotulo" data-t="campoRotulo">Nome da carta</label>
+        <div class="busca-linha">
+          <div class="combo">
+            <input id="campo-busca" type="text" inputmode="search" enterkeyhint="search"
+              role="combobox" aria-autocomplete="list" aria-expanded="false"
+              aria-controls="sugestoes" aria-describedby="busca-dica" spellcheck="false">
+            <ul id="sugestoes" role="listbox" class="sugestoes" hidden data-t-label="sugestoesRotulo" aria-label="Sugestões"></ul>
+          </div>
+          <button class="botao botao-primario" type="submit">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+            <span data-t="buscar">Buscar</span>
+          </button>
+        </div>
+        <p id="busca-dica" class="dica" data-t="buscaDica">Digite 2 letras ou mais. Pode ser em inglês ou português.</p>
+      </form>
+
+      <p class="status" id="status-busca" role="status" aria-live="polite"></p>
+
+      <section class="bloco" aria-labelledby="t-recentes">
+        <h2 id="t-recentes" class="titulo-bloco" data-t="recentes">Lidas recentemente</h2>
+        <ul class="lista-recentes" id="lista-recentes"></ul>
+        <p class="vazio" id="recentes-vazio" data-t="recentesVazio">As cartas que você abrir ficam aqui e abrem mesmo sem internet.</p>
+      </section>
+
+      <section class="bloco bloco-breve" aria-labelledby="t-breve">
+        <h2 id="t-breve" class="titulo-bloco" data-t="breveTitulo">Em breve</h2>
+        <ul class="lista-breve">
+          <li>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg>
+            <span data-t="breveVoz">Falar o nome da carta</span>
+          </li>
+          <li>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+            <span data-t="breveCamera">Apontar a câmera para a carta</span>
+          </li>
+        </ul>
+      </section>
+    </section>
+
+    <section class="tela" id="tela-carta" data-rota="carta" aria-labelledby="t-carta" hidden>
+      <div id="carta-conteudo"></div>
+    </section>
+
+    <section class="tela" id="tela-glossario" data-rota="glossario" aria-labelledby="t-glossario" hidden>
+      <h1 id="t-glossario" class="titulo-tela" data-t="glossarioTitulo">Glossário</h1>
+      <p class="intro" data-t="glossarioIntro">Palavras-chave que aparecem nas cartas, explicadas em poucas palavras.</p>
+      <label for="filtro-glossario" class="rotulo" data-t="glossarioFiltro">Procurar palavra</label>
+      <input id="filtro-glossario" type="search" class="campo" aria-describedby="glossario-contagem">
+      <p id="glossario-contagem" class="dica" role="status" aria-live="polite"></p>
+      <p class="aviso-idioma" id="glossario-aviso-idioma" hidden data-t="conteudoEmPt">Por enquanto, este conteúdo está só em português.</p>
+      <div id="lista-glossario" class="lista-glossario"></div>
+    </section>
+
+    <section class="tela" id="tela-ajustes" data-rota="ajustes" aria-labelledby="t-ajustes" hidden>
+      <h1 id="t-ajustes" class="titulo-tela" data-t="ajustesTitulo">Leitura e ajustes</h1>
+
+      <section class="bloco" aria-labelledby="t-previa">
+        <h2 id="t-previa" class="titulo-bloco" data-t="previa">Prévia</h2>
+        <div class="previa">
+          <p class="previa-nome">Exemplo de carta</p>
+          <p class="previa-custo"><span data-t="custo">Custo</span>: <strong data-t="previaCusto">2 de qualquer tipo e 1 azul</strong></p>
+          <p data-t="previaTexto">Voar. Quando esta criatura entra, compre uma carta.</p>
+        </div>
+      </section>
+
+      <section class="bloco" aria-labelledby="t-leitura">
+        <h2 id="t-leitura" class="titulo-bloco" data-t="leitura">Modo de leitura</h2>
+
+        <fieldset class="grupo">
+          <legend data-t="tamanho">Tamanho da letra</legend>
+          <div class="segmentado" data-ajuste="tamanho">
+            <label><input type="radio" name="tamanho" value="1"><span>A</span><span class="sr-only" data-t="tam1">normal</span></label>
+            <label><input type="radio" name="tamanho" value="2"><span class="seg-2">A</span><span class="sr-only" data-t="tam2">grande</span></label>
+            <label><input type="radio" name="tamanho" value="3"><span class="seg-3">A</span><span class="sr-only" data-t="tam3">maior</span></label>
+            <label><input type="radio" name="tamanho" value="4"><span class="seg-4">A</span><span class="sr-only" data-t="tam4">máximo</span></label>
+          </div>
+        </fieldset>
+
+        <fieldset class="grupo">
+          <legend data-t="espacamento">Espaçamento</legend>
+          <div class="segmentado" data-ajuste="espaco">
+            <label><input type="radio" name="espaco" value="1"><span data-t="esp1">Normal</span></label>
+            <label><input type="radio" name="espaco" value="2"><span data-t="esp2">Amplo</span></label>
+            <label><input type="radio" name="espaco" value="3"><span data-t="esp3">Extra</span></label>
+          </div>
+        </fieldset>
+
+        <div class="linha-chave">
+          <div>
+            <p class="chave-titulo" id="r-contraste" data-t="contraste">Contraste máximo</p>
+            <p class="chave-desc" id="d-contraste" data-t="contrasteDesc">Fundo mais escuro e letras mais claras, sem tons intermediários.</p>
+          </div>
+          <button type="button" class="chave" id="chave-contraste" aria-pressed="false" aria-labelledby="r-contraste" aria-describedby="d-contraste"><span aria-hidden="true"></span></button>
+        </div>
+      </section>
+
+      <section class="bloco" aria-labelledby="t-aparencia">
+        <h2 id="t-aparencia" class="titulo-bloco" data-t="aparencia">Aparência</h2>
+
+        <fieldset class="grupo">
+          <legend data-t="tema">Tema</legend>
+          <div class="segmentado" data-ajuste="tema">
+            <label><input type="radio" name="tema" value="sistema"><span data-t="temaSistema">Do aparelho</span></label>
+            <label><input type="radio" name="tema" value="claro"><span data-t="temaClaro">Claro</span></label>
+            <label><input type="radio" name="tema" value="escuro"><span data-t="temaEscuro">Escuro</span></label>
+          </div>
+        </fieldset>
+
+        <div class="linha-chave">
+          <div>
+            <p class="chave-titulo" id="r-animacoes" data-t="animacoes">Animações</p>
+            <p class="chave-desc" id="d-animacoes" data-t="animacoesDesc">Transições suaves entre as telas.</p>
+          </div>
+          <button type="button" class="chave" id="chave-animacoes" aria-pressed="true" aria-labelledby="r-animacoes" aria-describedby="d-animacoes"><span aria-hidden="true"></span></button>
+        </div>
+
+        <fieldset class="grupo grupo-prototipo">
+          <legend data-t="paleta">Paleta de cores (só no protótipo)</legend>
+          <p class="chave-desc" data-t="paletaDesc">Escolha qual paleta seguirá para o app.</p>
+          <div class="paletas" data-ajuste="paleta">
+            <label><input type="radio" name="paleta" value="floresta"><span class="amostra amostra-floresta" aria-hidden="true"></span><span>Floresta</span></label>
+            <label><input type="radio" name="paleta" value="brasa"><span class="amostra amostra-brasa" aria-hidden="true"></span><span>Brasa</span></label>
+            <label><input type="radio" name="paleta" value="mare"><span class="amostra amostra-mare" aria-hidden="true"></span><span>Maré</span></label>
+          </div>
+        </fieldset>
+      </section>
+
+      <section class="bloco" aria-labelledby="t-idioma-ajustes">
+        <h2 id="t-idioma-ajustes" class="titulo-bloco" data-t="idioma">Idioma do app</h2>
+        <button type="button" class="botao botao-secundario botao-largo" id="abrir-idioma-ajustes" aria-haspopup="dialog">
+          <span id="idioma-nome">Português</span>
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+        </button>
+      </section>
+    </section>
+
+    <section class="tela" id="tela-ajuda" data-rota="ajuda" aria-labelledby="t-ajuda" hidden>
+      <h1 id="t-ajuda" class="titulo-tela" data-t="ajudaTitulo">Antes de usar</h1>
+      <p class="intro" data-t="ajudaIntro">O que pode mudar de um aparelho para outro, em poucas palavras.</p>
+      <p class="aviso-idioma" id="ajuda-aviso-idioma" hidden data-t="conteudoEmPt">Por enquanto, este conteúdo está só em português.</p>
+      <div class="lista-ajuda" lang="pt-BR">
+        <section class="cartao-ajuda" aria-labelledby="a1">
+          <h2 id="a1">Permissões</h2>
+          <p>A câmera e o microfone pedem a sua autorização e só funcionam em páginas seguras (HTTPS).</p>
+        </section>
+        <section class="cartao-ajuda" aria-labelledby="a2">
+          <h2 id="a2">Voz</h2>
+          <p>Funciona melhor no Chrome do Android. Alguns navegadores não têm essa função, como o Firefox para Android (<a href="https://caniuse.com/speech-recognition" target="_blank" rel="noopener noreferrer"><span class="link-texto">ver suporte</span><span class="sr-only"> (abre em nova aba)</span></a>).</p>
+          <p>No iPhone, o reconhecimento de voz não funciona com o app instalado na tela inicial. Nesse caso, abra pelo navegador. A voz costuma precisar de internet.</p>
+        </section>
+        <section class="cartao-ajuda" aria-labelledby="a3">
+          <h2 id="a3">Câmera</h2>
+          <p>Pode errar o nome da carta, principalmente com carta foil, reflexo, pouca luz e letras decorativas. Por isso o app sempre pergunta: “É esta carta?”.</p>
+        </section>
+        <section class="cartao-ajuda" aria-labelledby="a4">
+          <h2 id="a4">Digitar sempre funciona</h2>
+          <p>Se a voz ou a câmera não funcionarem, dá para digitar o nome.</p>
+        </section>
+        <section class="cartao-ajuda" aria-labelledby="a5">
+          <h2 id="a5">Internet</h2>
+          <p>Buscar uma carta nova precisa de internet. As cartas que você já abriu ficam guardadas no aparelho e abrem de novo sem rede.</p>
+        </section>
+        <section class="cartao-ajuda" aria-labelledby="a6">
+          <h2 id="a6">Vozes e idiomas</h2>
+          <p>As vozes que leem a carta dependem do seu aparelho. O texto da carta só aparece no idioma escolhido se existir essa versão. Se não existir, o app mostra em inglês e avisa.</p>
+        </section>
+        <section class="cartao-ajuda" aria-labelledby="a7">
+          <h2 id="a7">Privacidade</h2>
+          <p>O app não pede cadastro e não usa cookies de rastreio. Suas preferências e as cartas abertas ficam só no seu aparelho.</p>
+        </section>
+        <section class="cartao-ajuda cartao-aviso" aria-labelledby="a8">
+          <h2 id="a8">Projeto não oficial</h2>
+          <p>Mana Vai é conteúdo de fã, gratuito, não aprovado nem endossado pela Wizards of the Coast (<a href="https://company.wizards.com/fancontentpolicy" target="_blank" rel="noopener noreferrer"><span class="link-texto">política de conteúdo de fãs</span><span class="sr-only"> (abre em nova aba)</span></a>).</p>
+          <p>Os dados e as imagens das cartas vêm da <a href="https://scryfall.com" target="_blank" rel="noopener noreferrer"><span class="link-texto">Scryfall</span><span class="sr-only"> (abre em nova aba)</span></a>, que não tem relação com o projeto. Para regras de torneio, consulte as fontes oficiais.</p>
+        </section>
+      </div>
+      <p class="assinatura">Mana Vai · Alessandra Brum</p>
+    </section>
+
+  </main>
+
+  <nav class="abas" aria-label="Principal" data-t-label="navPrincipal">
+    <a href="#/buscar" data-aba="buscar">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+      <span data-t="abaBuscar">Buscar</span>
+    </a>
+    <a href="#/glossario" data-aba="glossario">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 4h10a4 4 0 014 4v12H9a4 4 0 01-4-4z"/><path d="M5 16a4 4 0 014-4h10"/></svg>
+      <span data-t="abaGlossario">Glossário</span>
+    </a>
+    <a href="#/ajustes" data-aba="ajustes">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+      <span data-t="abaAjustes">Leitura</span>
+    </a>
+    <a href="#/ajuda" data-aba="ajuda">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>
+      <span data-t="abaAjuda">Antes de usar</span>
+    </a>
+  </nav>
+
+  <button type="button" class="seta-topo" id="seta-topo" hidden>
+    <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 19V6M6 11l6-6 6 6"/></svg>
+    <span class="sr-only" data-t="voltarTopo">Voltar ao topo</span>
+  </button>
+
+  <dialog class="folha" id="folha-idioma" aria-labelledby="t-folha-idioma">
+    <form method="dialog" class="folha-conteudo">
+      <span class="folha-alca" aria-hidden="true"></span>
+      <h2 id="t-folha-idioma" class="titulo-bloco" data-t="idioma">Idioma do app</h2>
+      <fieldset class="grupo-radios">
+        <legend class="sr-only" data-t="idioma">Idioma do app</legend>
+        <label class="opcao"><input type="radio" name="idioma" value="pt"><span lang="pt-BR">Português</span></label>
+        <label class="opcao"><input type="radio" name="idioma" value="en"><span lang="en">English</span></label>
+        <label class="opcao"><input type="radio" name="idioma" value="es"><span lang="es">Español</span></label>
+      </fieldset>
+      <div class="folha-acoes">
+        <button class="botao botao-secundario" value="cancelar" data-t="cancelar">Cancelar</button>
+        <button class="botao botao-primario" value="confirmar" data-t="confirmar">Confirmar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <p class="sr-only" id="anuncio" role="status" aria-live="polite"></p>
+</body>
+</html>

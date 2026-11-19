@@ -1,0 +1,13 @@
+{
+  "name": "Grimório Noturno",
+  "short_name": "Grimório",
+  "description": "Entenda uma carta de Magic na hora: leitura em voz alta, custo de mana em palavras e modo de leitura.",
+  "lang": "pt-BR",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0E0710",
+  "theme_color": "#0E0710",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

@@ -1,3 +1,21 @@
-
 #only for team use
 interno/
+node_modules/
+dist/
+dist-ssr/
+.env
+.env.*
+*.local
+*.log
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+Mana Vai — contexto do projeto.md
+prompts-acessibilidade.md
