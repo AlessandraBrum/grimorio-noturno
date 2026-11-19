@@ -44,10 +44,12 @@ test.describe('Busca de carta', () => {
     await expect(page.getByText('Você está sem internet.')).toBeVisible()
   })
 
-  test('usa a rota do site se a conexão direta falhar com internet disponível', async ({ page }) => {
-    await page.route('https://api.scryfall.com/**', (rota) => rota.abort('failed'))
-    await page.route('**/api/scryfall/cards/search?*', (rota) => rota.fulfill({ status: 404, json: { object: 'error' } }))
-    await page.route('**/api/scryfall/cards/named?*', (rota) => rota.fulfill({ json: CARTA_FALSA }))
+  test('repete uma consulta que falhou com internet disponível', async ({ page }) => {
+    let tentativas = 0
+    await page.route('https://api.scryfall.com/cards/named?*', (rota) => {
+      tentativas += 1
+      return tentativas === 1 ? rota.abort('failed') : rota.fulfill({ json: CARTA_FALSA })
+    })
     const campo = page.getByRole('combobox', { name: 'Nome da carta' })
     await campo.fill('Midnight Owl')
     await campo.press('Enter')
@@ -56,7 +58,6 @@ test.describe('Busca de carta', () => {
 
   test('uma API indisponível com internet disponível não acusa falta de internet', async ({ page }) => {
     await page.route('https://api.scryfall.com/**', (rota) => rota.abort('failed'))
-    await page.route('**/api/scryfall/**', (rota) => rota.abort('failed'))
     const campo = page.getByRole('combobox', { name: 'Nome da carta' })
     await campo.fill('Midnight Owl')
     await campo.press('Enter')

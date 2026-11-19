@@ -28,9 +28,12 @@ async function pedir<T>(caminho: string, sinal?: AbortSignal): Promise<T> {
     sinal?.throwIfAborted()
     if (!navigator.onLine) throw new SemConexao()
     try {
-      resposta = await fetch('/api/scryfall' + caminho, opcoes)
+      await esperarVez()
+      sinal?.throwIfAborted()
+      resposta = await fetch(BASE + caminho, opcoes)
     } catch {
       sinal?.throwIfAborted()
+      if (!navigator.onLine) throw new SemConexao()
       throw new ServicoDeCartasIndisponivel()
     }
   }

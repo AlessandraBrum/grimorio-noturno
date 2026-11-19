@@ -155,7 +155,7 @@ const pt = {
     privacidadeItens: [
       'Não há cadastro, login, anúncios, analytics nem cookies de rastreio.',
       'Ficam guardados só neste aparelho, no armazenamento do navegador: suas preferências (idioma, tema, animações, letra) e as últimas cartas que você abriu, para abrirem sem internet. Nada disso é enviado para nós.',
-      'Quando você busca uma carta, o nome da carta é enviado ao Scryfall, diretamente ou pelo servidor que hospeda o Grimório, e as imagens das cartas vêm dos servidores do Scryfall. O Scryfall recebe o seu endereço IP, como em qualquer site. Veja a política de privacidade do Scryfall.',
+      'Quando você busca uma carta, o nome digitado é enviado para a API do Scryfall, e as imagens das cartas vêm dos servidores do Scryfall. O Scryfall recebe o seu endereço IP, como em qualquer site. Veja a política de privacidade do Scryfall.',
       'As fontes ficam no próprio app: nenhuma fonte é carregada de servidores de terceiros.',
       'O serviço de hospedagem pode registrar dados técnicos de acesso, como o IP: [CONFIRMAR HOSPEDAGEM].',
       'Você pode apagar tudo o que está guardado aqui a qualquer momento.',
@@ -353,7 +353,7 @@ const en: Textos = {
     privacidadeItens: [
       'No sign-up, login, ads, analytics or tracking cookies.',
       'Only kept on this device, in the browser storage: your preferences (language, theme, animations, text) and the last cards you opened, so they open offline. None of it is sent to us.',
-      'When you search for a card, the card name is sent to Scryfall, directly or through Grimório Noturno’s hosting provider, and card images come from Scryfall’s servers. Scryfall receives your IP address, like any website. See Scryfall’s privacy policy.',
+      'When you search for a card, the name you type is sent to the Scryfall API, and card images come from Scryfall’s servers. Scryfall receives your IP address, like any website. See Scryfall’s privacy policy.',
       'Fonts are bundled with the app: no font is loaded from third-party servers.',
       'The hosting service may log technical access data, such as IP: [CONFIRM HOSTING].',
       'You can delete everything stored here at any time.',
