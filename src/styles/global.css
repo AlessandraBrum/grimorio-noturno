@@ -853,6 +853,10 @@ body::before {
     box-shadow: 0 0 0 2px var(--lua);
   }
 
+  .botao-entrada:hover:not(:disabled) {
+    box-shadow: 0 0 0 1px var(--rosa), 0 0 18px rgb(255 95 143 / 45%);
+  }
+
   .player__som[aria-pressed="true"]:hover {
     background: color-mix(in srgb, var(--vinho) 75%, #000);
     color: var(--sobre-vinho);
