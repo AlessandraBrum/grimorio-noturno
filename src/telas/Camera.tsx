@@ -1,62 +1,57 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
-import { lerLinhas, prepararImagem, prepararLeitor } from '../api/ocr'
-import { buscarCarta, identificarCandidatos, SemConexao, ServicoDeCartasIndisponivel } from '../api/scryfall'
+import { prepararLeitor } from '../api/ocr'
+import { buscarCarta, SemConexao, ServicoDeCartasIndisponivel } from '../api/scryfall'
 import { EntradaAlternativa } from '../components/EntradaAlternativa'
 import { Icone } from '../components/Icone'
 import { usePreferencias } from '../contexto/usePreferencias'
-import { carregarBase, reconhecerImagem, type Reconhecimento } from '../reconhecimento/reconhecer'
-import type { Card, Idioma } from '../types/card'
+import { DetectorDeEstabilidade } from '../reconhecimento/estabilidade'
+import { identificarCarta, prepararIdentificacao } from '../reconhecimento/identificar'
+import type { Card } from '../types/card'
 
 type Estado = 'abrindo' | 'procurando' | 'sem-camera' | 'lendo-foto' | 'erro'
 
-const RODADAS_ATE_A_DICA = 4
-const RODADAS_DE_IMAGEM_ATE_A_DICA = 40
-const CERTEZA_IMEDIATA = { distancia: 12, margem: 8 }
-const CERTEZA_REPETIDA = { distancia: 22, margem: 4 }
-
-function confiavel(resultado: Reconhecimento | null, limite: { distancia: number; margem: number }) {
-  return !!resultado && resultado.distancia <= limite.distancia && resultado.margem >= limite.margem
-}
-
-async function baseDisponivel() {
-  try {
-    await carregarBase()
-    return true
-  } catch {
-    return false
-  }
-}
+const TEMPO_PARADO_MS = 800
+const PAUSA_ENTRE_LEITURAS_MS = 1500
+const INTERVALO_DE_OBSERVACAO_MS = 100
+const LEITURAS_ATE_A_DICA = 3
 
 function esperar(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-function avisarQueReconheceu() {
-  if ('vibrate' in navigator) navigator.vibrate(150)
+function bipe(frequencia: number, duracao: number, volume: number) {
   try {
     const audio = new AudioContext()
     const tom = audio.createOscillator()
-    const volume = audio.createGain()
-    tom.frequency.value = 880
-    volume.gain.setValueAtTime(0.15, audio.currentTime)
-    volume.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + 0.18)
-    tom.connect(volume).connect(audio.destination)
+    const ganho = audio.createGain()
+    tom.frequency.value = frequencia
+    ganho.gain.setValueAtTime(volume, audio.currentTime)
+    ganho.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + duracao)
+    tom.connect(ganho).connect(audio.destination)
     tom.start()
-    tom.stop(audio.currentTime + 0.18)
+    tom.stop(audio.currentTime + duracao)
     tom.onended = () => void audio.close()
   } catch {
     return
   }
 }
 
-async function identificarImagem(
-  imagem: HTMLCanvasElement,
-  idioma: Idioma,
-  aoProgredir: (porcentagem: number) => void,
-) {
-  const linhas = await lerLinhas(imagem, aoProgredir)
-  if (!linhas.length) return { nomes: [], certeza: false }
-  return identificarCandidatos(linhas.map((linha) => linha.texto), idioma, 'camera')
+function avisarCaptura() {
+  if ('vibrate' in navigator) navigator.vibrate(40)
+  bipe(520, 0.07, 0.08)
+}
+
+function avisarQueReconheceu() {
+  if ('vibrate' in navigator) navigator.vibrate(150)
+  bipe(880, 0.18, 0.15)
+}
+
+function fotografar(video: HTMLVideoElement) {
+  const quadro = document.createElement('canvas')
+  quadro.width = video.videoWidth
+  quadro.height = video.videoHeight
+  quadro.getContext('2d')?.drawImage(video, 0, 0, quadro.width, quadro.height)
+  return quadro
 }
 
 export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void; aoDigitar: () => void }) {
@@ -83,9 +78,7 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
   })
 
   useEffect(() => {
-    void baseDisponivel().then((pronta) => {
-      if (!pronta) prepararLeitor().catch(() => {})
-    })
+    void prepararIdentificacao()
   }, [])
 
   useEffect(() => {
@@ -129,13 +122,18 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
     }
     let ativo = true
     let recebeuQuadro = false
-    let rodadas = 0
+    let leituras = 0
+    const detector = new DetectorDeEstabilidade(TEMPO_PARADO_MS)
 
-    async function procurarPelaImagem() {
-      let anterior: Reconhecimento | null = null
+    async function procurarSemParar() {
+      await prepararIdentificacao()
+      await prepararLeitor((porcentagem) => {
+        if (ativo && porcentagem < 100) setMensagem(t.camera.baixando(porcentagem))
+      }).catch(() => {})
       while (ativo) {
         const video = videoRef.current
         if (document.hidden || !video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+          detector.reiniciar()
           await esperar(document.hidden ? 500 : 50)
           continue
         }
@@ -144,61 +142,24 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
           setLendoQuadros(true)
           setMensagem(t.camera.procurandoNome)
         }
-        const resultado = await reconhecerImagem(video, video.videoWidth, video.videoHeight)
+        await esperar(INTERVALO_DE_OBSERVACAO_MS)
         if (!ativo) return
-        const repetido = !!resultado && anterior?.nome === resultado.nome
-          && confiavel(resultado, CERTEZA_REPETIDA) && confiavel(anterior, CERTEZA_REPETIDA)
-        if (resultado && (confiavel(resultado, CERTEZA_IMEDIATA) || repetido)) {
-          avisarQueReconheceu()
-          setMensagem(t.camera.carregandoFicha)
-          try {
-            const carta = await buscarCarta(resultado.nome, preferencias.idioma)
-            if (ativo) abrirRef.current(carta)
-            return
-          } catch (erro) {
-            if (!ativo) return
-            setMensagem(erro instanceof SemConexao ? t.buscar.semInternet
-              : erro instanceof ServicoDeCartasIndisponivel ? t.buscar.servicoIndisponivel : t.camera.dica)
-            await esperar(3000)
-          }
-        }
-        anterior = resultado
-        rodadas += 1
-        if (rodadas === RODADAS_DE_IMAGEM_ATE_A_DICA) setMensagem(t.camera.dica)
-        await esperar(30)
-      }
-    }
-
-    async function procurarSemParar() {
-      if (await baseDisponivel()) return procurarPelaImagem()
-      while (ativo) {
-        const video = videoRef.current
-        if (document.hidden || !video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
-          await esperar(document.hidden ? 500 : 50)
-          continue
-        }
+        if (!detector.observar(video, performance.now())) continue
+        avisarCaptura()
+        setMensagem(t.camera.lendo)
+        const quadro = fotografar(video)
         try {
-          if (!recebeuQuadro) {
-            recebeuQuadro = true
-            setLendoQuadros(true)
-            setMensagem(t.camera.procurandoNome)
-          }
-          const imagem = prepararImagem(video, video.videoWidth, video.videoHeight)
-          const resultado = await identificarImagem(imagem, preferencias.idioma, (porcentagem) => {
-            if (ativo && porcentagem < 100) setMensagem(t.camera.baixando(porcentagem))
-          })
+          const carta = await identificarCarta(quadro, quadro.width, quadro.height, preferencias.idioma)
           if (!ativo) return
-          if (document.hidden) continue
-          if (resultado.certeza) {
+          if (carta) {
             avisarQueReconheceu()
             setMensagem(t.camera.carregandoFicha)
-            const carta = await buscarCarta(resultado.nomes[0], preferencias.idioma)
-            if (ativo) abrirRef.current(carta)
+            const ficha = await buscarCarta(carta.nome, preferencias.idioma)
+            if (ativo) abrirRef.current(ficha)
             return
           }
-          rodadas += 1
-          setMensagem(rodadas >= RODADAS_ATE_A_DICA ? t.camera.dica : t.camera.procurandoNome)
-          await esperar(60)
+          leituras += 1
+          setMensagem(leituras >= LEITURAS_ATE_A_DICA ? t.camera.dica : t.camera.procurandoNome)
         } catch (erro) {
           if (!ativo) return
           if (erro instanceof ServicoDeCartasIndisponivel) {
@@ -207,8 +168,9 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
           } else {
             setMensagem(erro instanceof SemConexao ? t.buscar.semInternet : t.camera.dica)
           }
-          await esperar(3000)
         }
+        detector.reiniciar()
+        await esperar(PAUSA_ENTRE_LEITURAS_MS)
       }
     }
 
@@ -222,41 +184,24 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
     const arquivo = evento.target.files?.[0]
     evento.target.value = ''
     if (!arquivo) return
-    await lerImagem(async () => {
-      const bitmap = await createImageBitmap(arquivo)
-      try {
-        return prepararImagem(bitmap, bitmap.width, bitmap.height)
-      } finally {
-        bitmap.close()
-      }
-    })
-  }
-
-  async function lerImagem(obterImagem: () => HTMLCanvasElement | Promise<HTMLCanvasElement>) {
     const sessao = sessaoRef.current?.signal
     const anterior = estado
     setLendoQuadros(false)
     setEstado('lendo-foto')
     setMensagem(t.camera.lendo)
     try {
-      const imagem = await obterImagem()
-      if (sessao?.aborted) return
-      const pelaImagem = (await baseDisponivel()) ? await reconhecerImagem(imagem, imagem.width, imagem.height) : null
-      if (sessao?.aborted) return
-      if (pelaImagem && confiavel(pelaImagem, CERTEZA_REPETIDA)) {
-        avisarQueReconheceu()
-        const carta = await buscarCarta(pelaImagem.nome, preferencias.idioma)
-        if (!sessao?.aborted) aoAbrir(carta)
-        return
+      const bitmap = await createImageBitmap(arquivo)
+      let carta
+      try {
+        carta = await identificarCarta(bitmap, bitmap.width, bitmap.height, preferencias.idioma)
+      } finally {
+        bitmap.close()
       }
-      const { nomes, certeza } = await identificarImagem(imagem, preferencias.idioma, (porcentagem) => {
-        if (!sessao?.aborted && porcentagem < 100) setMensagem(t.camera.baixando(porcentagem))
-      })
       if (sessao?.aborted) return
-      if (certeza) {
+      if (carta) {
         avisarQueReconheceu()
-        const carta = await buscarCarta(nomes[0], preferencias.idioma)
-        if (!sessao?.aborted) aoAbrir(carta)
+        const ficha = await buscarCarta(carta.nome, preferencias.idioma)
+        if (!sessao?.aborted) aoAbrir(ficha)
         return
       }
       setEstado(temCamera ? 'procurando' : 'erro')

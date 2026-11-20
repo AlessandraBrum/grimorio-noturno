@@ -134,8 +134,7 @@ interface Janela {
 
 const JANELAS_PARA_REFINAR = 6
 
-export async function reconhecerImagem(origem: CanvasImageSource, largura: number, altura: number): Promise<Reconhecimento | null> {
-  const dados = await carregarBase()
+export function quadroDeTrabalho(origem: CanvasImageSource, largura: number, altura: number) {
   const escala = Math.min(1, LADO_DE_TRABALHO / Math.max(largura, altura))
   const w = Math.max(1, Math.round(largura * escala))
   const h = Math.max(1, Math.round(altura * escala))
@@ -145,7 +144,12 @@ export async function reconhecerImagem(origem: CanvasImageSource, largura: numbe
   const contexto = tela.getContext('2d', { willReadFrequently: true })
   if (!contexto) return null
   contexto.drawImage(origem, 0, 0, w, h)
-  const soma = imagemIntegral(tonsDeCinza(contexto.getImageData(0, 0, w, h).data, w, h), w, h)
+  return contexto.getImageData(0, 0, w, h)
+}
+
+export async function reconhecerQuadro(rgba: Uint8ClampedArray, w: number, h: number): Promise<Reconhecimento | null> {
+  const dados = await carregarBase()
+  const soma = imagemIntegral(tonsDeCinza(rgba, w, h), w, h)
 
   const busca = prepararBusca(dados)
   const melhoresJanelas: Janela[] = []
@@ -199,7 +203,5 @@ export async function reconhecerImagem(origem: CanvasImageSource, largura: numbe
     }
   }
   if (melhorNome < 0) return null
-  const r = { nome: dados.nomes[melhorNome], distancia: melhor, margem: segundo - melhor }
-  ;((window as unknown as { __DEPURAR__: unknown[] }).__DEPURAR__ ??= []).push(r)
-  return r
+  return { nome: dados.nomes[melhorNome], distancia: melhor, margem: segundo - melhor }
 }

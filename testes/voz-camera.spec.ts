@@ -45,7 +45,7 @@ test.describe('Escanear com a câmera', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Escanear carta' })).toBeVisible()
   })
 
-  test('a câmera lê a carta em fundo escuro e abre sem interação', async ({ page }) => {
+  test('a câmera espera a carta parar, lê o nome e abre sem interação', async ({ page }) => {
     await page.addInitScript(() => {
       const getUserMedia = async () => {
         const canvas = document.createElement('canvas')
@@ -58,7 +58,8 @@ test.describe('Escanear com a câmera', () => {
           contexto.fillStyle = '#2a2525'
           contexto.fillRect(0, 0, 1600, 900)
           contexto.save()
-          contexto.translate(85 + Math.sin(tempo / 60) * 16, 160)
+          const mexendo = tempo < 1200
+          contexto.translate(85 + (mexendo ? Math.sin(tempo / 60) * 16 : 0), 160)
           contexto.filter = tempo < 800 ? 'blur(12px)' : 'none'
           contexto.fillStyle = 'black'
           contexto.fillRect(0, 0, 470, 650)
@@ -84,7 +85,7 @@ test.describe('Escanear com a câmera', () => {
     await expect(page.getByRole('status').filter({ hasText: 'Leitura automática ativa' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Capturar quadro e ler' })).toHaveCount(0)
     await expect(page.getByRole('heading', { level: 1, name: 'Midnight Owl' })).toBeVisible({ timeout: 15_000 })
-    expect(modelos.sort()).toEqual(['/leitor/eng.traineddata.gz', '/leitor/por.traineddata.gz'])
+    expect(modelos).toEqual(['/leitor/eng.traineddata.gz'])
   })
 
   test('sem câmera, oferece foto e botões de voz e digitação', async ({ page }) => {
@@ -151,21 +152,21 @@ test.describe('Escanear com a câmera', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Escanear carta' })).toBeVisible()
   })
 
-  test('descarta um token sem relação com Acidic Slime', async ({ page }) => {
+  test('corrige pelo catálogo de nomes uma letra que faltou na leitura', async ({ page }) => {
     await semCamera(page)
-    await simularLeitorDeTexto(page, 'Acidic Slim\nCreature - Ooze')
-    await page.route(/\/cards\/named\?fuzzy=Acidic/, (rota) => rota.fulfill({
-      json: { ...CARTA_FALSA, name: 'Forest', type_line: 'Token Land' },
+    await simularLeitorDeTexto(page, 'Acidic Slim')
+    await page.route(/\/cards\/named\?exact=Acidic/, (rota) => rota.fulfill({
+      json: { ...CARTA_FALSA, name: 'Acidic Slime', type_line: 'Creature — Ooze' },
     }))
     await page.goto('/#camera')
     await page.locator('input[type="file"]').setInputFiles(FOTO_DA_CARTA)
-    await expect(page.getByRole('status').filter({ hasText: 'Não consegui ler o nome' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Acidic Slime' })).toBeVisible()
   })
 
   test('reconhece o nome e o tipo da face visível de Liliana', async ({ page }) => {
     await semCamera(page)
     await simularLeitorDeTexto(page, 'Liliana, Heretical Healer\nLegendary Creature - Human Cleric\nLifelink')
-    await page.route(/\/cards\/named\?fuzzy=Liliana/, (rota) => rota.fulfill({
+    await page.route(/\/cards\/named\?.*Liliana/, (rota) => rota.fulfill({
       json: {
         ...CARTA_FALSA,
         name: 'Liliana, Heretical Healer // Liliana, Defiant Necromancer',

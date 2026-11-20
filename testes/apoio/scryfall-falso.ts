@@ -19,6 +19,13 @@ export const CARTA_FALSA = {
 
 const NOMES = ['Midnight Owl', 'Midnight Oil', 'Midnight Haunting']
 
+const CATALOGO = [
+  ...NOMES,
+  'Acidic Slime',
+  'Lifelink',
+  'Liliana, Heretical Healer // Liliana, Defiant Necromancer',
+]
+
 const PNG_VAZIO = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
   'base64',
@@ -38,6 +45,9 @@ export async function simularScryfall(page: Page) {
     const url = new URL(rota.request().url())
     const busca = (url.searchParams.get('q') ?? url.searchParams.get('fuzzy') ?? '').toLowerCase()
 
+    if (url.pathname === '/catalog/card-names') {
+      return rota.fulfill({ json: { object: 'catalog', data: CATALOGO } })
+    }
     if (url.pathname === '/cards/autocomplete') {
       const data = NOMES.filter((nome) => nome.toLowerCase().includes(busca))
       return rota.fulfill({ json: { object: 'catalog', data } })
