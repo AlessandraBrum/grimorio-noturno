@@ -44,7 +44,7 @@ function lerPasta(pasta) {
 const cartas = PASTA ? lerPasta(PASTA) : await sortearCartas()
 const servidor = await createServer({ server: { port: 5310, strictPort: true, open: false }, logLevel: 'error' })
 await servidor.listen()
-const navegador = await chromium.launch()
+const navegador = await chromium.launch(process.env.CHROMIUM ? { executablePath: process.env.CHROMIUM } : {})
 const pagina = await navegador.newPage()
 await pagina.goto('http://localhost:5310/')
 const cdp = await pagina.context().newCDPSession(pagina)
@@ -127,11 +127,22 @@ const resultados = await pagina.evaluate(async (cartas) => {
       const tela = quadro(imagens[indice], outra, variante)
       const inicio = performance.now()
       const resultado = await identificarCarta(tela, tela.width, tela.height, 'en')
+      const msPrimeira = performance.now() - inicio
+      let lido = resultado?.nome ?? null
+      let msConfirmacao = 0
+      if (lido) {
+        const segundo = quadro(imagens[indice], outra, variante)
+        const inicioDaConfirmacao = performance.now()
+        const confirmacao = await identificarCarta(segundo, segundo.width, segundo.height, 'en', { pista: resultado.pista })
+        msConfirmacao = performance.now() - inicioDaConfirmacao
+        if (confirmacao?.nome !== lido) lido = null
+      }
       saida.push({
         nome: carta.nome,
         variante: variante.alterada ? 'arte alterada' : `giro ${variante.giro}°`,
-        lido: resultado?.nome ?? null,
-        ms: Math.round(performance.now() - inicio),
+        lido,
+        primeiro: resultado?.nome ?? null,
+        ms: Math.round(msPrimeira + msConfirmacao),
       })
     }
   }
@@ -160,8 +171,8 @@ const percentil = (lista, p) => lista[Math.min(lista.length - 1, Math.floor(list
 
 console.log(`Cartas: ${cartas.length}  Quadros: ${resultados.length}  Processador ${LENTIDAO}x mais lento`)
 console.log(`Reconhecidas: ${certas.length} (${Math.round((certas.length / resultados.length) * 100)}%)`)
-console.log(`Abriram a carta errada: ${erradas.length}`)
-console.log(`Tempo de leitura, média ${media(tempos)} ms, mediana ${percentil(tempos, 0.5)} ms, 90% abaixo de ${percentil(tempos, 0.9)} ms`)
+console.log(`Abriram a carta errada: ${erradas.length} (sem a confirmação dupla seriam ${resultados.filter((r) => r.primeiro && !mesmoNome(r.primeiro, r.nome)).length})`)
+console.log(`Tempo das duas leituras, média ${media(tempos)} ms, mediana ${percentil(tempos, 0.5)} ms, 90% abaixo de ${percentil(tempos, 0.9)} ms, pior ${tempos.at(-1) ?? 0} ms`)
 if (tempoDaFicha.length) console.log(`Busca da ficha no Scryfall, média ${media(tempoDaFicha)} ms`)
 for (const variante of [...new Set(resultados.map((r) => r.variante))]) {
   const grupo = resultados.filter((r) => r.variante === variante)

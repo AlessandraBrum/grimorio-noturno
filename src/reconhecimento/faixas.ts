@@ -76,8 +76,8 @@ function mapaDeBordas(cinza: Uint8Array, w: number, h: number) {
   return bordas
 }
 
-function manchar(bordas: Uint8Array, w: number, h: number) {
-  const vao = Math.max(3, Math.round(w * 0.014))
+function manchar(bordas: Uint8Array, w: number, h: number, vaoRelativo: number) {
+  const vao = Math.max(3, Math.round(w * vaoRelativo))
   const mancha = new Uint8Array(w * h)
   for (let y = 0; y < h; y++) {
     const linha = y * w
@@ -161,9 +161,9 @@ function dividirEmLinhas(caixa: Caixa, rotulo: number, rotulos: Int32Array, bord
   return linhas
 }
 
-function linhasDeTexto(cinza: Uint8Array, w: number, h: number): Retangulo[] {
+function linhasDeTexto(cinza: Uint8Array, w: number, h: number, vaoRelativo: number): Retangulo[] {
   const bordas = mapaDeBordas(cinza, w, h)
-  const { rotulos, caixas } = rotular(manchar(bordas, w, h), w, h)
+  const { rotulos, caixas } = rotular(manchar(bordas, w, h, vaoRelativo), w, h)
   const maiorLado = Math.max(w, h)
   const linhas: Retangulo[] = []
   caixas.forEach((caixa, rotulo) => {
@@ -240,9 +240,9 @@ function inclinacao(cinza: Uint8Array, w: number, h: number) {
   return melhor
 }
 
-export function endireitar(origem: CanvasImageSource, largura: number, altura: number) {
-  const imagem = tonsDeCinza(origem, largura, altura)
-  const graus = imagem ? inclinacao(imagem.cinza, imagem.w, imagem.h) : 0
+export function endireitar(origem: CanvasImageSource, largura: number, altura: number, grausConhecidos?: number) {
+  const imagem = grausConhecidos === undefined ? tonsDeCinza(origem, largura, altura) : null
+  const graus = grausConhecidos ?? (imagem ? inclinacao(imagem.cinza, imagem.w, imagem.h) : 0)
   const tela = document.createElement('canvas')
   tela.width = largura
   tela.height = altura
@@ -255,12 +255,16 @@ export function endireitar(origem: CanvasImageSource, largura: number, altura: n
   return { tela, graus }
 }
 
-export function encontrarFaixas(origem: CanvasImageSource, largura: number, altura: number): Faixa[] {
+const VAO_NO_QUADRO = 0.014
+const VAO_NA_CARTA = 0.03
+
+export function encontrarFaixas(origem: CanvasImageSource, largura: number, altura: number, cartaRecortada = false): Faixa[] {
   const imagem = tonsDeCinza(origem, largura, altura)
   if (!imagem) return []
   const { cinza, w, h, escala } = imagem
-  const deitadas = linhasDeTexto(cinza, w, h)
-  const empe = linhasDeTexto(transpor(cinza, w, h), h, w)
+  const vao = cartaRecortada ? VAO_NA_CARTA : VAO_NO_QUADRO
+  const deitadas = linhasDeTexto(cinza, w, h, vao)
+  const empe = linhasDeTexto(transpor(cinza, w, h), h, w, vao)
   const paraFaixa = (vertical: boolean) => (r: Retangulo): Faixa => vertical
     ? { x: r.y / escala, y: r.x / escala, largura: r.altura / escala, altura: r.largura / escala, peso: r.peso, vertical }
     : { x: r.x / escala, y: r.y / escala, largura: r.largura / escala, altura: r.altura / escala, peso: r.peso, vertical }
@@ -270,4 +274,97 @@ export function encontrarFaixas(origem: CanvasImageSource, largura: number, altu
     ? [horizontais, verticais]
     : [verticais, horizontais]
   return [...primeira.slice(0, 5), ...segunda.slice(0, 3)].slice(0, MAXIMO_DE_FAIXAS)
+}
+
+export interface Regiao {
+  x: number
+  y: number
+  largura: number
+  altura: number
+}
+
+const OCUPACAO_MINIMA_DA_CARTA = 0.08
+const OCUPACAO_MAXIMA_DA_CARTA = 0.6
+const FOLGA_DA_REGIAO = 0.04
+
+function faixaMaisForte(contagem: Float32Array) {
+  const suave = new Float32Array(contagem.length)
+  const raio = Math.max(3, Math.round(contagem.length * 0.02))
+  for (let i = 0; i < contagem.length; i++) {
+    let soma = 0
+    let n = 0
+    for (let k = Math.max(0, i - raio); k <= Math.min(contagem.length - 1, i + raio); k++) {
+      soma += contagem[k]
+      n++
+    }
+    suave[i] = soma / n
+  }
+  let maximo = 0
+  for (const valor of suave) if (valor > maximo) maximo = valor
+  if (!maximo) return null
+  const limiar = maximo * 0.18
+  const vaoAceito = Math.round(contagem.length * 0.06)
+  let fimDoUltimo = -Infinity
+  let melhor: [number, number] | null = null
+  let massaDoMelhor = 0
+  let inicio = -1
+  let massa = 0
+  for (let i = 0; i <= suave.length; i++) {
+    if (i < suave.length && suave[i] >= limiar) {
+      if (inicio < 0) {
+        const juntar = melhor && i - fimDoUltimo <= vaoAceito && melhor[1] === fimDoUltimo
+        inicio = juntar ? melhor![0] : i
+        massa = juntar ? massaDoMelhor : 0
+      }
+      massa += suave[i]
+      continue
+    }
+    if (inicio >= 0) {
+      if (massa > massaDoMelhor) {
+        massaDoMelhor = massa
+        melhor = [inicio, i - 1]
+      }
+      fimDoUltimo = i - 1
+    }
+    inicio = -1
+  }
+  return melhor
+}
+
+export interface Localizacao {
+  regiao: Regiao | null
+  ocupacao: number
+}
+
+export function localizarCarta(origem: CanvasImageSource, largura: number, altura: number): Localizacao {
+  const nada = { regiao: null, ocupacao: 0 }
+  const imagem = tonsDeCinza(origem, largura, altura)
+  if (!imagem) return nada
+  const { cinza, w, h, escala } = imagem
+  const forte = new Uint8Array(w * h)
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x
+      if (Math.abs(cinza[i + 1] - cinza[i - 1]) + Math.abs(cinza[i + w] - cinza[i - w]) > 48) forte[i] = 1
+    }
+  }
+  const colunas = new Float32Array(w)
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) colunas[x] += forte[y * w + x]
+  const faixaX = faixaMaisForte(colunas)
+  if (!faixaX) return nada
+  const linhas = new Float32Array(h)
+  for (let y = 0; y < h; y++) for (let x = faixaX[0]; x <= faixaX[1]; x++) linhas[y] += forte[y * w + x]
+  const faixaY = faixaMaisForte(linhas)
+  if (!faixaY) return nada
+  const lw = faixaX[1] - faixaX[0] + 1
+  const lh = faixaY[1] - faixaY[0] + 1
+  const ocupacao = (lw * lh) / (w * h)
+  const proporcao = Math.max(lw, lh) / Math.min(lw, lh)
+  if (ocupacao < OCUPACAO_MINIMA_DA_CARTA || ocupacao > OCUPACAO_MAXIMA_DA_CARTA || proporcao > 2) return { regiao: null, ocupacao }
+  const folga = Math.max(lw, lh) * FOLGA_DA_REGIAO
+  const x0 = Math.max(0, faixaX[0] - folga)
+  const y0 = Math.max(0, faixaY[0] - folga)
+  const x1 = Math.min(w, faixaX[1] + 1 + folga)
+  const y1 = Math.min(h, faixaY[1] + 1 + folga)
+  return { regiao: { x: x0 / escala, y: y0 / escala, largura: (x1 - x0) / escala, altura: (y1 - y0) / escala }, ocupacao }
 }

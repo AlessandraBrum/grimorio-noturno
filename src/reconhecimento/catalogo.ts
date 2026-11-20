@@ -4,6 +4,7 @@ const CANDIDATOS = 250
 const SOBRA_NO_INICIO = 2
 const SOBRA_NO_FIM = 3
 const NOME_CURTO = 5
+const NOME_INCOMPLETO = /_|-$/
 
 interface Catalogo {
   nomes: string[]
@@ -90,6 +91,7 @@ function indexar(nomesCompletos: string[]): Catalogo {
   const vistos = new Set<string>()
   for (const completo of nomesCompletos) {
     for (const face of completo.split(' // ')) {
+      if (NOME_INCOMPLETO.test(face)) continue
       const chave = chaveDoNome(face)
       if (chave.length < 3 || vistos.has(chave)) continue
       vistos.add(chave)

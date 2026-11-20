@@ -5,7 +5,7 @@ import { EntradaAlternativa } from '../components/EntradaAlternativa'
 import { Icone } from '../components/Icone'
 import { usePreferencias } from '../contexto/usePreferencias'
 import { DetectorDeEstabilidade } from '../reconhecimento/estabilidade'
-import { identificarCarta, prepararIdentificacao } from '../reconhecimento/identificar'
+import { identificarCarta, prepararIdentificacao, type Diagnostico } from '../reconhecimento/identificar'
 import type { Card } from '../types/card'
 
 type Estado = 'abrindo' | 'procurando' | 'sem-camera' | 'lendo-foto' | 'erro'
@@ -14,6 +14,7 @@ const TEMPO_PARADO_MS = 800
 const PAUSA_ENTRE_LEITURAS_MS = 1500
 const INTERVALO_DE_OBSERVACAO_MS = 100
 const LEITURAS_ATE_A_DICA = 3
+const PAUSA_ANTES_DE_CONFIRMAR_MS = 120
 
 function esperar(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -39,6 +40,10 @@ function bipe(frequencia: number, duracao: number, volume: number) {
 function avisarCaptura() {
   if ('vibrate' in navigator) navigator.vibrate(40)
   bipe(520, 0.07, 0.08)
+}
+
+function avisarDica() {
+  if ('vibrate' in navigator) navigator.vibrate([60, 80, 60])
 }
 
 function avisarQueReconheceu() {
@@ -149,17 +154,31 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
         setMensagem(t.camera.lendo)
         const quadro = fotografar(video)
         try {
-          const carta = await identificarCarta(quadro, quadro.width, quadro.height, preferencias.idioma)
+          const diagnostico: Diagnostico = { dica: null }
+          const carta = await identificarCarta(quadro, quadro.width, quadro.height, preferencias.idioma, { diagnostico })
           if (!ativo) return
           if (carta) {
-            avisarQueReconheceu()
-            setMensagem(t.camera.carregandoFicha)
-            const ficha = await buscarCarta(carta.nome, preferencias.idioma)
-            if (ativo) abrirRef.current(ficha)
-            return
+            setMensagem(t.camera.confirmando)
+            await esperar(PAUSA_ANTES_DE_CONFIRMAR_MS)
+            if (!ativo) return
+            const segundo = fotografar(video)
+            const confirmacao = await identificarCarta(segundo, segundo.width, segundo.height, preferencias.idioma, { pista: carta.pista })
+            if (!ativo) return
+            if (confirmacao?.nome === carta.nome) {
+              avisarQueReconheceu()
+              setMensagem(t.camera.carregandoFicha)
+              const ficha = await buscarCarta(carta.nome, preferencias.idioma)
+              if (ativo) abrirRef.current(ficha)
+              return
+            }
           }
-          leituras += 1
-          setMensagem(leituras >= LEITURAS_ATE_A_DICA ? t.camera.dica : t.camera.procurandoNome)
+          if (diagnostico.dica) {
+            avisarDica()
+            setMensagem(diagnostico.dica === 'aproxime' ? t.camera.aproxime : t.camera.endireite)
+          } else {
+            leituras += 1
+            setMensagem(leituras >= LEITURAS_ATE_A_DICA ? t.camera.dica : t.camera.procurandoNome)
+          }
         } catch (erro) {
           if (!ativo) return
           if (erro instanceof ServicoDeCartasIndisponivel) {
