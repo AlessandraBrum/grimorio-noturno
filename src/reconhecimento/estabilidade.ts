@@ -9,6 +9,7 @@ export class DetectorDeEstabilidade {
   private readonly tela = document.createElement('canvas')
   private readonly contexto: CanvasRenderingContext2D | null
   private readonly tempoParado: number
+  brilho = 255
 
   constructor(tempoParado: number) {
     this.tempoParado = tempoParado
@@ -33,6 +34,7 @@ export class DetectorDeEstabilidade {
       soma += atual[i]
     }
     const media = soma / atual.length
+    this.brilho = media
     let variancia = 0
     for (let i = 0; i < atual.length; i++) variancia += (atual[i] - media) ** 2
     const temConteudo = Math.sqrt(variancia / atual.length) >= CONTRASTE_MINIMO

@@ -15,6 +15,8 @@ const PAUSA_ENTRE_LEITURAS_MS = 1500
 const INTERVALO_DE_OBSERVACAO_MS = 100
 const LEITURAS_ATE_A_DICA = 3
 const PAUSA_ANTES_DE_CONFIRMAR_MS = 120
+const BRILHO_ESCURO = 60
+const INTERVALO_DO_AVISO_DE_ESCURO_MS = 10000
 
 function esperar(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -51,6 +53,15 @@ function avisarQueReconheceu() {
   bipe(880, 0.18, 0.15)
 }
 
+function trilhaDeVideo(fluxo: MediaStream | null) {
+  return fluxo?.getVideoTracks()[0]
+}
+
+function temLuz(trilha: MediaStreamTrack | undefined) {
+  const capacidades = trilha?.getCapabilities?.() as { torch?: boolean } | undefined
+  return !!capacidades?.torch
+}
+
 function fotografar(video: HTMLVideoElement) {
   const quadro = document.createElement('canvas')
   quadro.width = video.videoWidth
@@ -66,6 +77,10 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
   const [temCamera, setTemCamera] = useState(false)
   const [lendoQuadros, setLendoQuadros] = useState(false)
   const [buscandoPorVoz, setBuscandoPorVoz] = useState(false)
+  const [temLanterna, setTemLanterna] = useState(false)
+  const [lanterna, setLanterna] = useState(false)
+  const [sugerirLuz, setSugerirLuz] = useState(false)
+  const lanternaRef = useRef({ existe: false, acesa: false })
   const videoRef = useRef<HTMLVideoElement>(null)
   const fotoRef = useRef<HTMLInputElement>(null)
   const fluxoRef = useRef<MediaStream | null>(null)
@@ -100,6 +115,11 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
       }
       fluxoRef.current = fluxo
       setTemCamera(true)
+      const trilha = trilhaDeVideo(fluxo)
+      const existe = temLuz(trilha)
+      lanternaRef.current = { existe, acesa: false }
+      setTemLanterna(existe)
+      void trilha?.applyConstraints({ advanced: [{ focusMode: 'continuous' } as MediaTrackConstraintSet] }).catch(() => {})
       if (videoRef.current) {
         videoRef.current.srcObject = fluxo
         void videoRef.current.play().catch(() => {})
@@ -129,6 +149,7 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
     let recebeuQuadro = false
     let leituras = 0
     const detector = new DetectorDeEstabilidade(TEMPO_PARADO_MS)
+    let ultimoAvisoDeEscuro = -Infinity
 
     async function procurarSemParar() {
       await prepararIdentificacao()
@@ -149,7 +170,15 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
         }
         await esperar(INTERVALO_DE_OBSERVACAO_MS)
         if (!ativo) return
-        if (!detector.observar(video, performance.now())) continue
+        const parada = detector.observar(video, performance.now())
+        const agora = performance.now()
+        if (detector.brilho < BRILHO_ESCURO && !lanternaRef.current.acesa && agora - ultimoAvisoDeEscuro > INTERVALO_DO_AVISO_DE_ESCURO_MS) {
+          ultimoAvisoDeEscuro = agora
+          avisarDica()
+          setMensagem(lanternaRef.current.existe ? t.camera.escuro : t.camera.escuroSemLuz)
+          setSugerirLuz(lanternaRef.current.existe)
+        }
+        if (!parada) continue
         avisarCaptura()
         setMensagem(t.camera.lendo)
         const quadro = fotografar(video)
@@ -198,6 +227,19 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
       ativo = false
     }
   }, [buscandoPorVoz, estado, preferencias.idioma, t])
+
+  async function alternarLanterna() {
+    const acesa = !lanterna
+    try {
+      await trilhaDeVideo(fluxoRef.current)?.applyConstraints({ advanced: [{ torch: acesa } as MediaTrackConstraintSet] })
+      lanternaRef.current.acesa = acesa
+      setLanterna(acesa)
+      setSugerirLuz(false)
+    } catch {
+      lanternaRef.current = { existe: false, acesa: false }
+      setTemLanterna(false)
+    }
+  }
 
   async function lerDaFoto(evento: ChangeEvent<HTMLInputElement>) {
     const arquivo = evento.target.files?.[0]
@@ -263,6 +305,11 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
         </div>
 
         <div className="camera__acoes">
+          {temLanterna && (
+            <button type="button" className={sugerirLuz ? 'botao-principal' : 'botao-secundario'} aria-pressed={lanterna} onClick={alternarLanterna}>
+              {lanterna ? t.camera.apagarLuz : t.camera.acenderLuz}
+            </button>
+          )}
           <button
             type="button"
             className={temCamera ? 'botao-secundario' : 'botao-principal'}
