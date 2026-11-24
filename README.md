@@ -124,9 +124,8 @@ seleções. Imagens maiores são reduzidas no dispositivo para caber em 3 MB por
 anexo. Se o navegador não conseguir abrir o formato, exporte a foto como JPEG
 ou PNG e tente novamente. Se uma
 parte falhar, o botão **Continuar envio** retoma das partes ainda sem confirmação
-enquanto a página estiver aberta. O Gmail aplica suas próprias cotas de envio.
+enquanto a página estiver aberta. O Resend aplica suas próprias cotas de envio.
 
-A rota aceita apenas envios da origem do site e encaminha para um destinatário
-fixo. Para reduzir spam em produção, configure uma regra de limitação por IP
-para `POST /api/contato` no Firewall da Vercel, com margem para múltiplas partes
-do mesmo formulário.
+A rota aceita apenas envios da origem do site e encaminha para o destinatário
+fixo. Contra spam, há um campo oculto e um limite de 60 partes a cada 10
+minutos por IP em cada instância da função.

@@ -5,6 +5,9 @@
   --veu-alto: #2a1527;
   --tinta: #f3e9ee;
   --tinta-suave: #cdb8c4;
+  --dica: #b8a0ae;
+  --rolagem-trilho: #1c0e1c;
+  --rolagem-barra: #e8b47e;
   --rosa: #ff8fa6;
   --vinho: #7a1238;
   --sobre-vinho: #f3e9ee;
@@ -25,6 +28,9 @@
   --veu-alto: #bda8b1;
   --tinta: #1a0b16;
   --tinta-suave: #3d2635;
+  --dica: #3d2635;
+  --rolagem-trilho: #bda8b1;
+  --rolagem-barra: #4a0820;
   --rosa: #4a0820;
   --vinho: #4a0820;
   --sobre-vinho: #f3e9ee;
@@ -41,6 +47,7 @@
 
 [data-contraste="extra"] {
   --tinta-suave: var(--tinta);
+  --dica: var(--tinta);
   --borda: var(--tinta);
 }
 

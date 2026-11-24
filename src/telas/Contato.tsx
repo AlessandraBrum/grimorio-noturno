@@ -1,5 +1,6 @@
 
 import { useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import { Seletor } from '../components/Seletor'
 import { usePreferencias } from '../contexto/usePreferencias'
 import { prepararImagem } from '../utils/imagemContato'
 import { ASSUNTOS, CONTATO, type Assunto } from '../i18n/contato'
@@ -9,8 +10,11 @@ export interface ContextoContato {
   imagem?: File
 }
 
-const DESTINO = 'ambuxedev@gmail.com'
+const EMAIL_PUBLICO = 'alessandrabrumcontato@gmail.com'
 const TELEFONE = /^\+[1-9]\d{7,14}$/
+const EMAIL = /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/
+
+type Campo = 'assunto' | 'mensagem' | 'resposta'
 
 export function Contato({ contexto }: { contexto?: ContextoContato }) {
   const { t, preferencias } = usePreferencias()
@@ -25,10 +29,10 @@ export function Contato({ contexto }: { contexto?: ContextoContato }) {
   const [enviando, setEnviando] = useState(false)
   const [parcial, setParcial] = useState(false)
   const [temMensagem, setTemMensagem] = useState(false)
+  const [erros, setErros] = useState<Partial<Record<Campo, string>>>({})
   const fila = useRef<{ partes: FormData[]; proxima: number } | null>(null)
   const lista = useRef<HTMLUListElement>(null)
   const seletor = useRef<HTMLInputElement>(null)
-  const telefone = useRef<HTMLInputElement>(null)
   const ocupado = useRef(false)
   const exemplo = assunto ? c.exemplos[assunto][1] : ''
 
@@ -50,6 +54,14 @@ export function Contato({ contexto }: { contexto?: ContextoContato }) {
     setImagens((atuais) => atuais.filter((_, posicao) => posicao !== indice))
   }
 
+  function limparErro(campo: Campo) {
+    if (erros[campo]) setErros((atuais) => ({ ...atuais, [campo]: undefined }))
+  }
+
+  function descricao(...ids: Array<string | false | undefined>) {
+    return ids.filter(Boolean).join(' ') || undefined
+  }
+
   async function enviar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault()
     if (ocupado.current || adicionando) return
@@ -59,13 +71,18 @@ export function Contato({ contexto }: { contexto?: ContextoContato }) {
       const dados = new FormData(formulario)
       const resposta = String(dados.get('resposta') ?? '').trim()
       const numero = resposta.replace(/[\s().-]/g, '')
-      if (canal === 'whatsapp' && !TELEFONE.test(numero)) {
-        telefone.current?.setCustomValidity(c.telefoneInvalido)
-        telefone.current?.reportValidity()
+      const mensagem = String(dados.get('mensagem') ?? '').trim()
+      const encontrados: Partial<Record<Campo, string>> = {}
+      if (!assunto) encontrados.assunto = c.faltaAssunto
+      if (!mensagem) encontrados.mensagem = c.faltaMensagem
+      if (canal === 'email' && !EMAIL.test(resposta)) encontrados.resposta = c.faltaEmail
+      if (canal === 'whatsapp' && !TELEFONE.test(numero)) encontrados.resposta = c.telefoneInvalido
+      setErros(encontrados)
+      const primeiro = (['assunto', 'mensagem', 'resposta'] as const).find((campo) => encontrados[campo])
+      if (primeiro || !assunto) {
+        if (primeiro) document.getElementById(`contato-${primeiro}`)?.focus()
         return
       }
-      const mensagem = String(dados.get('mensagem') ?? '').trim()
-      if (!mensagem || !assunto) return
       const textos = mensagem.match(/[\s\S]{1,50000}/gu) ?? []
       const id = crypto.randomUUID()
       const total = textos.length + imagens.length
@@ -78,6 +95,7 @@ export function Contato({ contexto }: { contexto?: ContextoContato }) {
         parte.set('id', id)
         parte.set('parte', String(indice + 1))
         parte.set('total', String(total))
+        parte.set('site', String(dados.get('site') ?? ''))
         if (typeof conteudo === 'string') parte.set('mensagem', conteudo)
         else parte.set('imagem', conteudo)
         return parte
@@ -123,53 +141,68 @@ export function Contato({ contexto }: { contexto?: ContextoContato }) {
     <div className="tela contato">
       <div className="tela__topo">
         <h1 id="titulo-tela" className="titulo-tela" tabIndex={-1}>{t.abas.contato}</h1>
-        <p className="texto-apoio">{c.intro} <a href={`mailto:${DESTINO}`}>{DESTINO}</a></p>
+        <p className="texto-apoio">{c.intro} <a href={`mailto:${EMAIL_PUBLICO}`}>{EMAIL_PUBLICO}</a></p>
       </div>
-      <form className="contato__form" onSubmit={enviar}>
+      <form className="contato__form" noValidate onSubmit={enviar}>
         <p>{c.obrigatorios}</p>
         {contexto && <p>{c.origem}: {contexto.origem}</p>}
         <fieldset className="contato__campos" disabled={enviando || parcial}>
-          <label className="campo contato__assunto">
-            <span className="campo__rotulo">{c.assunto}</span>
-            <select className="campo__entrada contato__select" value={assunto} required onChange={(e) => setAssunto(e.target.value as Assunto | '')}>
-              <option value="" disabled>{c.escolher}</option>
-              {ASSUNTOS.map((opcao) => <option key={opcao} value={opcao}>{c.exemplos[opcao][0]}</option>)}
-            </select>
-          </label>
+          <Seletor<Assunto>
+            id="contato-assunto"
+            rotulo={c.assunto}
+            vazio={c.escolher}
+            valor={assunto}
+            opcoes={ASSUNTOS.map((opcao) => ({ valor: opcao, rotulo: c.exemplos[opcao][0] }))}
+            desativado={enviando || parcial}
+            invalido={!!erros.assunto}
+            descricao={descricao(erros.assunto && 'contato-assunto-erro')}
+            aoMudar={(novo) => {
+              setAssunto(novo)
+              limparErro('assunto')
+            }}
+          />
+          {erros.assunto && <p id="contato-assunto-erro" className="contato__erro">{erros.assunto}</p>}
 
           <div className="campo">
             <label className="campo__rotulo" htmlFor="contato-mensagem">{c.mensagem}</label>
             <div className="contato__mensagem">
               <textarea id="contato-mensagem" name="mensagem" className="campo__entrada" rows={6} required
-                aria-describedby={exemplo ? 'contato-exemplo' : undefined}
+                aria-invalid={erros.mensagem ? true : undefined}
+                aria-describedby={descricao(exemplo && 'contato-exemplo', erros.mensagem && 'contato-mensagem-erro')}
                 onChange={(e) => {
-                  const valor = e.target.value
-                  setTemMensagem(valor.length > 0)
-                  e.target.setCustomValidity(valor && !valor.trim() ? c.mensagem : '')
+                  setTemMensagem(e.target.value.length > 0)
+                  limparErro('mensagem')
                 }} />
               {exemplo && <span id="contato-exemplo" className={temMensagem ? 'visualmente-oculto' : 'contato__exemplo'}>
                 {exemplo}{assunto === 'agradecimento' && <span aria-hidden="true"> *****</span>}
               </span>}
             </div>
+            {erros.mensagem && <p id="contato-mensagem-erro" className="contato__erro">{erros.mensagem}</p>}
           </div>
 
           <fieldset className="contato__canais">
             <legend className="campo__rotulo">{c.canal}</legend>
-            <label><input type="radio" name="canal" checked={canal === 'email'} onChange={() => setCanal('email')} /> {c.email}</label>
-            <label><input type="radio" name="canal" checked={canal === 'whatsapp'} onChange={() => setCanal('whatsapp')} /> {c.whatsapp}</label>
+            <label><input type="radio" name="canal" checked={canal === 'email'} onChange={() => { setCanal('email'); limparErro('resposta') }} /> {c.email}</label>
+            <label><input type="radio" name="canal" checked={canal === 'whatsapp'} onChange={() => { setCanal('whatsapp'); limparErro('resposta') }} /> {c.whatsapp}</label>
           </fieldset>
 
           {canal === 'email' ? (
             <label className="campo" key="email">
               <span className="campo__rotulo">{c.email}</span>
-              <input className="campo__entrada" type="email" name="resposta" autoComplete="email" maxLength={254} pattern="[^@]+@[^@]+\.[^@]+" required />
+              <input id="contato-resposta" className="campo__entrada" type="email" name="resposta" autoComplete="email" maxLength={254} required
+                aria-invalid={erros.resposta ? true : undefined} aria-describedby={descricao(erros.resposta && 'contato-resposta-erro')}
+                onChange={() => limparErro('resposta')} />
+              {erros.resposta && <span id="contato-resposta-erro" className="contato__erro">{erros.resposta}</span>}
             </label>
           ) : (
             <label className="campo" key="whatsapp">
               <span className="campo__rotulo">{c.numero}</span>
-              <input ref={telefone} className="campo__entrada" type="tel" name="resposta" autoComplete="tel" required
-                aria-describedby="contato-ddd" onChange={(e) => e.target.setCustomValidity('')} />
+              <input id="contato-resposta" className="campo__entrada" type="tel" name="resposta" autoComplete="tel" required
+                aria-invalid={erros.resposta ? true : undefined}
+                aria-describedby={descricao('contato-ddd', erros.resposta && 'contato-resposta-erro')}
+                onChange={() => limparErro('resposta')} />
               <span id="contato-ddd" className="legenda">{c.ddd}</span>
+              {erros.resposta && <span id="contato-resposta-erro" className="contato__erro">{erros.resposta}</span>}
             </label>
           )}
 
@@ -188,6 +221,10 @@ export function Contato({ contexto }: { contexto?: ContextoContato }) {
                 </li>
               ))}
             </ul>}
+          </div>
+          <div className="contato__armadilha" aria-hidden="true">
+            <label htmlFor="contato-site">{c.armadilha}</label>
+            <input id="contato-site" name="site" type="text" tabIndex={-1} autoComplete="off" />
           </div>
         </fieldset>
         <button type="submit" className="botao-principal" aria-disabled={enviando || adicionando}>{parcial ? c.continuar : c.enviar}</button>

@@ -28,6 +28,6 @@ export async function prepararImagem(arquivo: File): Promise<File | undefined> {
       imagem.close()
     }
   } catch {
-    // Alguns formatos de foto só podem ser abertos pela galeria do aparelho.
+    return
   }
 }
