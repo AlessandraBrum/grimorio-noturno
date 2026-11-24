@@ -2,7 +2,9 @@ import { lerLinha } from '../api/ocr'
 import { identificarCandidatos } from '../api/scryfall'
 import type { Idioma } from '../types/card'
 import { carregarCatalogo, chaveDoNome, procurarNoCatalogo, type Achado } from './catalogo'
-import { encontrarFaixas, endireitar, localizarCarta, type Faixa } from './faixas'
+import { lerQuadro, orientacoes, recortarNome } from './barraDoNome'
+import { encontrarContornos } from './contorno'
+import { encontrarFaixas, endireitar, type Faixa } from './faixas'
 import { prepararArte, reconhecerArte } from './arte'
 import type { Reconhecimento } from './reconhecer'
 
@@ -12,11 +14,12 @@ const NOME_CERTO = 0.84
 const FOLGA_ENTRE_NOMES = 0.1
 const FOLGA_COM_NOME_EXATO = 0.06
 const NOME_POSSIVEL = 0.6
-const ORCAMENTO_MS = 1700
+const ORCAMENTO_MS = 1600
+const CONTORNOS_TESTADOS = 2
+const ESPERA_PELA_ARTE_MS = 400
 const PROPORCAO_MAXIMA_DO_NOME = 24
 const CONFIANCA_PARA_BUSCAR_ONLINE = 70
 const CONFIANCA_MINIMA = 25
-const LADO_DA_CARTA_RECORTADA = 1400
 const CARTA_PEQUENA = 0.12
 const CARTA_TORTA_GRAUS = 8
 const SO_TIPO = /^\W*((legendary|basic|snow|artifact|creature|enchantment|instant|sorcery|land|planeswalker|battle|kindred|tribal|criatura|artefato|encantamento|magica|feitico|terreno|lendari[oa])\s*)+\W*$/i
@@ -33,22 +36,13 @@ export interface Diagnostico {
   dica: Dica
 }
 
-export interface Pista {
-  recortada: boolean
-  faixa: Faixa
-  giro: number
-  graus: number
-}
-
 export interface CartaIdentificada {
   nome: string
   porArte: boolean
-  pista?: Pista
 }
 
 interface Opcoes {
   diagnostico?: Diagnostico
-  pista?: Pista
 }
 
 function recortar(origem: CanvasImageSource, faixa: Faixa, giro: number) {
@@ -122,6 +116,10 @@ function tentativas(faixas: Faixa[]) {
   return lista
 }
 
+function esperar(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 function arteConfiavel(arte: Reconhecimento | null, distancia: number, margem: number) {
   return !!arte && arte.distancia <= distancia && arte.margem >= margem
 }
@@ -153,59 +151,56 @@ interface Leitura {
   catalogo: Awaited<ReturnType<typeof carregarCatalogo>>
 }
 
-function recortarCarta(origem: CanvasImageSource, regiao: { x: number; y: number; largura: number; altura: number }) {
-  const escala = LADO_DA_CARTA_RECORTADA / Math.max(regiao.largura, regiao.altura)
-  const tela = document.createElement('canvas')
-  tela.width = Math.round(regiao.largura * escala)
-  tela.height = Math.round(regiao.altura * escala)
-  tela.getContext('2d')?.drawImage(origem, regiao.x, regiao.y, regiao.largura, regiao.altura, 0, 0, tela.width, tela.height)
-  return tela
-}
-
-async function tentar(reta: HTMLCanvasElement, tentativa: Tentativa, faixas: Faixa[], leitura: Leitura) {
-  const { faixa, giro } = tentativa
-  const { texto, confianca } = await lerLinha(recortar(reta, faixa, giro))
+async function avaliarTexto(texto: string, confianca: number, leitura: Leitura) {
   if (confianca > leitura.melhor.confianca && texto.replace(/[^a-z]/gi, '').length >= 4) leitura.melhor = { texto, confianca }
   const semAcento = texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
   if (confianca < CONFIANCA_MINIMA || LINHA_DE_TIPO.test(semAcento) || SO_TIPO.test(semAcento) || LINHA_DE_DIREITOS.test(semAcento)) return null
   const achados = procurarNoCatalogo(leitura.catalogo, texto)
-  if (achados[0]?.pontuacao >= NOME_POSSIVEL) leitura.arte = await leitura.promessaDaArte
+  const pontuacao = achados[0]?.pontuacao ?? 0
+  if (!leitura.arte && pontuacao >= NOME_POSSIVEL && pontuacao < NOME_CERTO) {
+    leitura.arte = await Promise.race([leitura.promessaDaArte, esperar(ESPERA_PELA_ARTE_MS).then(() => null)])
+  }
   const decisao = decidir(achados, leitura.arte)
   if (decisao === 'conflito') {
     leitura.conflito = true
     return null
   }
+  return decisao
+}
+
+async function tentar(reta: HTMLCanvasElement, tentativa: Tentativa, faixas: Faixa[], leitura: Leitura) {
+  const { faixa, giro } = tentativa
+  const { texto, confianca } = await lerLinha(recortar(reta, faixa, giro))
+  const decisao = await avaliarTexto(texto, confianca, leitura)
   if (decisao && NOMES_QUE_SAO_PALAVRAS_DE_REGRA.has(chaveDoNome(decisao.nome))
     && (!faixas.length || !ePrimeiraLinha(tentativa, faixas))) return null
   return decisao
 }
 
-async function lerNomes(
-  origem: CanvasImageSource,
-  largura: number,
-  altura: number,
-  leitura: Leitura,
-  cartaRecortada: boolean,
-  pista?: Pista,
-): Promise<CartaIdentificada | null> {
-  const usarPista = pista?.recortada === cartaRecortada ? pista : undefined
-  const { tela: reta, graus } = endireitar(origem, largura, altura, usarPista?.graus)
-  if (cartaRecortada || !leitura.inclinacao) leitura.inclinacao = graus
-  const comPista = (decisao: CartaIdentificada, faixa: Faixa, giro: number) => (
-    { ...decisao, pista: { recortada: cartaRecortada, faixa, giro, graus } }
-  )
-  if (usarPista) {
-    const decisao = await tentar(reta, usarPista, [], leitura)
-    if (decisao) return comPista(decisao, usarPista.faixa, usarPista.giro)
+async function lerBarraDoNome(origem: CanvasImageSource, largura: number, altura: number, leitura: Leitura) {
+  const contornos = encontrarContornos(origem, largura, altura, CONTORNOS_TESTADOS)
+  const quadro = contornos.length ? lerQuadro(origem, largura, altura) : null
+  if (!quadro) return { decisao: null, ocupacao: 0 }
+  for (const contorno of contornos) {
+    for (const cantos of orientacoes(contorno.cantos)) {
+      if (performance.now() - leitura.inicio > ORCAMENTO_MS) return { decisao: null, ocupacao: contornos[0].ocupacao }
+      const { texto, confianca } = await lerLinha(recortarNome(quadro, cantos))
+      const decisao = await avaliarTexto(texto, confianca, leitura)
+      if (decisao) return { decisao, ocupacao: contorno.ocupacao }
+    }
   }
-  const faixas = encontrarFaixas(reta, largura, altura, cartaRecortada)
-  const fila = faixas.length
-    ? tentativas(faixas)
-    : [{ faixa: { x: 0, y: 0, largura, altura, vertical: false, peso: 0 }, giro: 0 }]
-  for (const tentativa of fila) {
+  return { decisao: null, ocupacao: contornos[0].ocupacao }
+}
+
+async function lerNomes(origem: CanvasImageSource, largura: number, altura: number, leitura: Leitura) {
+  if (performance.now() - leitura.inicio > ORCAMENTO_MS) return null
+  const { tela: reta, graus } = endireitar(origem, largura, altura)
+  leitura.inclinacao = graus
+  const faixas = encontrarFaixas(reta, largura, altura)
+  for (const tentativa of tentativas(faixas)) {
     if (performance.now() - leitura.inicio > ORCAMENTO_MS) break
     const decisao = await tentar(reta, tentativa, faixas, leitura)
-    if (decisao) return comPista(decisao, tentativa.faixa, tentativa.giro)
+    if (decisao) return decisao
   }
   return null
 }
@@ -219,23 +214,19 @@ export async function identificarCarta(
   largura: number,
   altura: number,
   idioma: Idioma,
-  { diagnostico, pista }: Opcoes = {},
+  { diagnostico }: Opcoes = {},
 ): Promise<CartaIdentificada | null> {
   const [catalogo] = await Promise.all([carregarCatalogo(), prepararArte().catch(() => null)])
-  const inicio = performance.now()
-  const promessaDaArte: Promise<Reconhecimento | null> = pista
-    ? Promise.resolve(null)
-    : reconhecerArte(origem, largura, altura).catch(() => null)
-  const leitura: Leitura = { arte: null, promessaDaArte, melhor: { texto: '', confianca: 0 }, conflito: false, inicio, inclinacao: 0, catalogo }
+  const promessaDaArte = reconhecerArte(origem, largura, altura).catch(() => null)
+  const leitura: Leitura = { arte: null, promessaDaArte, melhor: { texto: '', confianca: 0 }, conflito: false, inicio: performance.now(), inclinacao: 0, catalogo }
+  void promessaDaArte.then((arte) => {
+    leitura.arte = arte
+  })
 
-  const { regiao, ocupacao } = localizarCarta(origem, largura, altura)
-  if (regiao) {
-    const carta = recortarCarta(origem, regiao)
-    const decisao = await lerNomes(carta, carta.width, carta.height, leitura, true, pista)
-    if (decisao) return decisao
-  }
-  const decisao = await lerNomes(origem, largura, altura, leitura, false, pista)
-  if (decisao) return decisao
+  const { decisao: pelaBarra, ocupacao } = await lerBarraDoNome(origem, largura, altura, leitura)
+  if (pelaBarra) return pelaBarra
+  const pelasLinhas = await lerNomes(origem, largura, altura, leitura)
+  if (pelasLinhas) return pelasLinhas
   if (diagnostico) {
     diagnostico.dica = ocupacao > 0 && ocupacao < CARTA_PEQUENA ? 'aproxime'
       : Math.abs(leitura.inclinacao) >= CARTA_TORTA_GRAUS ? 'endireite' : null
@@ -245,8 +236,7 @@ export async function identificarCarta(
   if (!conflito && idioma === 'pt' && melhorLeitura.confianca >= CONFIANCA_PARA_BUSCAR_ONLINE) {
     try {
       const { nomes, certeza } = await identificarCandidatos([melhorLeitura.texto], idioma, 'camera')
-      const arteFinal = await promessaDaArte
-      const arteContra = arteConfiavel(arteFinal, 12, 8) && arteFinal!.nome !== nomes[0]
+      const arteContra = arteConfiavel(leitura.arte, 12, 8) && leitura.arte!.nome !== nomes[0]
       if (certeza && nomes[0] && !arteContra) return { nome: nomes[0], porArte: false }
     } catch {
       return null
