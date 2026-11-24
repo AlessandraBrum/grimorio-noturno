@@ -1720,3 +1720,133 @@ body::before {
   transition: none !important;
   scroll-behavior: auto !important;
 }
+
+
+.contato {
+  max-width: 46rem;
+  margin-inline: auto;
+  overflow-wrap: anywhere;
+}
+
+.contato__form,
+.contato__campos,
+.contato__anexos {
+  display: grid;
+  gap: var(--espaco-4);
+  min-inline-size: 0;
+}
+
+.contato__form {
+  justify-items: start;
+}
+
+.contato__campos,
+.contato__canais {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-inline-size: 0;
+}
+
+.contato__form .campo__entrada {
+  width: 100%;
+  color: var(--tinta);
+  font: inherit;
+}
+
+.contato__select {
+  appearance: none;
+  padding-inline-end: var(--espaco-6);
+}
+
+.contato__assunto {
+  position: relative;
+}
+
+.contato__assunto::after {
+  content: '';
+  position: absolute;
+  inset-inline-end: var(--espaco-4);
+  inset-block-end: 1.55rem;
+  width: .5rem;
+  height: .5rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+
+.contato__mensagem {
+  display: grid;
+}
+
+.contato__mensagem > * {
+  grid-area: 1 / 1;
+}
+
+.contato__mensagem textarea {
+  padding: var(--espaco-4);
+  border-radius: var(--raio-md);
+  resize: vertical;
+}
+
+.contato__exemplo {
+  padding: calc(var(--espaco-4) + 1px);
+  font-style: italic;
+  color: var(--tinta-suave);
+  pointer-events: none;
+}
+
+.contato__canais label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  min-height: 44px;
+  margin-inline-end: var(--espaco-4);
+}
+
+.contato__canais input {
+  accent-color: var(--rosa);
+}
+
+.contato__form input[type='file'] {
+  padding: var(--espaco-2) var(--espaco-4);
+  border-radius: var(--raio-md);
+}
+
+.contato__form input[type='file']::file-selector-button {
+  min-height: 40px;
+  margin-inline-end: var(--espaco-2);
+  border-radius: var(--raio-sm);
+  border: 1px solid var(--borda);
+  padding-inline: var(--espaco-2);
+  color: var(--tinta);
+  background: var(--veu-alto);
+  font: inherit;
+}
+
+.contato__anexos {
+  padding-inline-start: var(--espaco-5);
+}
+
+.contato__anexos li > span {
+  margin-inline-end: var(--espaco-3);
+}
+
+
+
+.ajuda__links {
+  display: grid;
+  gap: var(--espaco-4);
+}
+
+.lista-links .ajuda__contato {
+  width: 100%;
+  min-height: 56px;
+  font-weight: 800;
+}
+
+.ajuda__contato:hover {
+  color: var(--sobre-vinho);
+}

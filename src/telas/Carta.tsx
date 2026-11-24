@@ -3,11 +3,12 @@ import { PlayerDeVoz } from '../components/PlayerDeVoz'
 import { FimDeSecao } from '../components/SetaTopo'
 import { usePreferencias } from '../contexto/usePreferencias'
 import { termosDaCarta } from '../data/glossario'
+import { CONTATO } from '../i18n/contato'
 import { TEXTOS } from '../i18n/textos'
 import type { Card } from '../types/card'
 import { custoEmPalavras } from '../utils/custoDeMana'
 
-export function Carta({ carta }: { carta: Card }) {
+export function Carta({ carta, aoReportar }: { carta: Card; aoReportar: () => void }) {
   const { t, preferencias } = usePreferencias()
   const idioma = preferencias.idioma
   const emPortugues = carta.lang === 'pt'
@@ -129,6 +130,7 @@ export function Carta({ carta }: { carta: Card }) {
             </dl>
           </section>
 
+          <button type="button" className="botao-secundario" onClick={aoReportar}>{CONTATO[idioma].relatar}</button>
           <a href="#leitura">{t.carta.ajustarLeitura}</a>
           <a href="#camera" className="botao-principal">
             <Icone nome="camera" tamanho={20} />

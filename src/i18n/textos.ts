@@ -12,6 +12,7 @@ const pt = {
     ajuda: 'Ajuda',
     sobre: 'Sobre',
     camera: 'Câmera',
+    contato: 'Contato',
   },
   buscar: {
     titulo: 'Qual carta você quer entender?',
@@ -173,6 +174,7 @@ const pt = {
       'As fontes ficam no próprio app: nenhuma fonte é carregada de servidores de terceiros.',
       'A leitura na nuvem é opcional e pode ser desligada na câmera. Quando ativada, o navegador recorta a faixa do título e envia somente esse recorte à Vercel, que o encaminha ao Google Cloud Vision para reconhecer o nome da carta. O restante do quadro fica no aparelho.',
       'O Grimório não guarda o recorte no servidor. Segundo o Google, o processamento síncrono da imagem ocorre em memória, e dados técnicos da solicitação podem ser registrados temporariamente. A Vercel pode registrar dados técnicos de acesso, como o endereço IP.',
+      'Ao enviar o formulário de contato, sua mensagem, o contato escolhido para resposta e os anexos seguem pela Vercel e pelo Gmail até a caixa de entrada da responsável.',
       'Alessandra Brum é a responsável pelo Grimório. Você pode usar o contato abaixo para exercer os direitos previstos no art. 18 da LGPD, como pedir acesso, correção ou eliminação de dados pessoais, quando aplicável.',
       'Você pode apagar tudo o que está guardado aqui a qualquer momento.',
     ],
@@ -226,6 +228,7 @@ const en: Textos = {
     ajuda: 'Help',
     sobre: 'About',
     camera: 'Camera',
+    contato: 'Contact',
   },
   buscar: {
     titulo: 'Which card do you want to understand?',
@@ -387,6 +390,7 @@ const en: Textos = {
       'Fonts are bundled with the app: no font is loaded from third-party servers.',
       'Cloud recognition is optional and can be turned off in the camera screen. When enabled, the browser sends only the title crop to Vercel, which forwards it to Google Cloud Vision to recognize the card name. The rest of the frame stays on the device.',
       'Grimório Noturno does not store the crop on the server. According to Google, synchronous image processing happens in memory, and technical request metadata may be logged temporarily. Vercel may log technical access data such as your IP address.',
+      'When you submit the contact form, your message, chosen reply details and attachments go through Vercel and Gmail to the maintainer’s inbox.',
       'Alessandra Brum is responsible for Grimório Noturno. Use the contact below to exercise your rights under Article 18 of Brazil’s LGPD, such as requesting access to, correction of or deletion of personal data where applicable.',
       'You can delete everything stored here at any time.',
     ],

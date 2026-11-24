@@ -7,7 +7,7 @@ export function Rodape() {
     <footer className="rodape">
       <div className="limite rodape__conteudo">
         <p>
-          {t.rodape.luna} <a href="#sobre">{t.abas.sobre}</a>
+          {t.rodape.luna} <a href="#sobre">{t.abas.sobre}</a> · <a href="#contato">{t.abas.contato}</a>
         </p>
         <p>{t.rodape.aviso}</p>
         <p className="rodape__versao">

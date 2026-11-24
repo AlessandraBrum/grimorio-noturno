@@ -39,6 +39,7 @@ export function Sobre() {
       <section className="cartao" aria-labelledby="sobre-app">
         <h2 id="sobre-app" className="titulo-secao">{s.oQueE}</h2>
         <p>{s.oQueETexto}</p>
+        <a href="#contato">{t.abas.contato}</a>
       </section>
 
       <section className="cartao" aria-labelledby="sobre-aparelhos">

@@ -28,7 +28,7 @@ export function Cabecalho({ tela, ajustesAbertos, aoAbrirAjustes, botaoAjustesRe
     <header className="cabecalho">
       <div className="limite cabecalho__linha">
         <div className={telaInicial ? 'marca' : 'marca marca--so-desktop'}>
-          <Icone nome="lua" tamanho={28} className="marca__lua" />
+          <img src="/favicon.svg?v=2" alt="" width={40} height={40} />
           <div>
             <p className="marca__nome">Grimório Noturno</p>
             <p className="marca__assinatura">{t.assinatura}</p>

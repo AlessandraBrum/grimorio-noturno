@@ -90,6 +90,7 @@ export function PainelAjustes({ aoFechar }: { aoFechar: () => void }) {
               <li><a className="botao-secundario" href="#leitura" onClick={aoFechar}>{t.leitura.titulo}</a></li>
               <li><a className="botao-secundario" href="#ajuda" onClick={aoFechar}>{t.ajuda.titulo}</a></li>
               <li><a className="botao-secundario" href="#sobre" onClick={aoFechar}>{t.abas.sobre}</a></li>
+              <li><a className="botao-secundario" href="#contato" onClick={aoFechar}>{t.abas.contato}</a></li>
             </ul>
           </nav>
         </div>

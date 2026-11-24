@@ -7,6 +7,8 @@ import { PainelAjustes } from './components/PainelAjustes'
 import { Rodape } from './components/Rodape'
 import { SetaTopo } from './components/SetaTopo'
 import { usePreferencias } from './contexto/usePreferencias'
+import { CONTATO } from './i18n/contato'
+import { Contato, type ContextoContato } from './telas/Contato'
 import { useTela } from './navegacao'
 import { carregarCatalogo } from './reconhecimento/catalogo'
 import { Ajuda } from './telas/Ajuda'
@@ -17,6 +19,7 @@ import { Glossario } from './telas/Glossario'
 import { Leitura } from './telas/Leitura'
 import { Sobre } from './telas/Sobre'
 import type { Card, Idioma } from './types/card'
+import { prepararImagem } from './utils/imagemContato'
 
 const ESPERA_PARA_AQUECER_MS = 1500
 
@@ -25,6 +28,9 @@ export function App() {
   const { tela, irPara } = useTela()
   const [cartaAberta, setCartaAberta] = useState<{ carta: Card; idioma: Idioma } | null>(null)
   const carta = cartaAberta?.carta
+  const [contextoContato, setContextoContato] = useState<ContextoContato>()
+  const quadroDaCarta = useRef<HTMLCanvasElement | File | undefined>(undefined)
+  const c = CONTATO[preferencias.idioma]
   const [estadoBusca, setEstadoBusca] = useState<EstadoBusca>('parado')
   const [ajustesAbertos, setAjustesAbertos] = useState(false)
   const botaoAjustesRef = useRef<HTMLButtonElement>(null)
@@ -77,11 +83,31 @@ export function App() {
     }
   }
 
-  function abrirCarta(escolhida: Card) {
+  function abrirCarta(escolhida: Card, quadro?: HTMLCanvasElement | File) {
+    quadroDaCarta.current = quadro
     setCartaAberta({ carta: escolhida, idioma: preferencias.idioma })
     lembrar(escolhida)
     irPara('carta')
   }
+
+  async function reportar(origem: string, quadro?: HTMLCanvasElement | File) {
+    let imagem: File | undefined
+    if (quadro instanceof File) imagem = await prepararImagem(quadro)
+    else if (quadro) {
+      const blob = await new Promise<Blob | null>((resolve) => quadro.toBlob(resolve, 'image/jpeg', 0.82))
+      if (blob) imagem = await prepararImagem(new File([blob], c.captura, { type: blob.type }))
+    }
+    setContextoContato({ origem, imagem })
+    irPara('contato')
+  }
+
+  useEffect(() => {
+    function limparContexto() {
+      if (window.location.hash !== '#contato') setContextoContato(undefined)
+    }
+    window.addEventListener('hashchange', limparContexto)
+    return () => window.removeEventListener('hashchange', limparContexto)
+  }, [])
 
   const ajustesJaAbriram = useRef(false)
 
@@ -106,9 +132,16 @@ export function App() {
     <>
       <Ceu />
       <div className="app" inert={ajustesAbertos}>
-        <a className="pular-conteudo" href="#nome-da-carta" onClick={() => irPara('buscar')}>
-          {t.pularParaBusca}
-        </a>
+        {telaVisivel === 'contato' ? (
+          <a className="pular-conteudo" href="#titulo-tela" onClick={(evento) => {
+            evento.preventDefault()
+            document.getElementById('titulo-tela')?.focus()
+          }}>{c.pular}</a>
+        ) : (
+          <a className="pular-conteudo" href="#nome-da-carta" onClick={() => irPara('buscar')}>
+            {t.pularParaBusca}
+          </a>
+        )}
         <Cabecalho
           tela={telaVisivel}
           ajustesAbertos={ajustesAbertos}
@@ -119,12 +152,13 @@ export function App() {
           {telaVisivel === 'buscar' && (
             <Buscar estado={estadoBusca} aoBuscar={abrirPorNome} aoAbrirRecente={abrirCarta} />
           )}
-          {telaVisivel === 'carta' && carta && <Carta key={carta.id + carta.lang} carta={carta} />}
+          {telaVisivel === 'carta' && carta && <Carta key={carta.id + carta.lang} carta={carta} aoReportar={() => void reportar(`${c.carta} (${carta.printedName ?? carta.name})`, quadroDaCarta.current)} />}
           {telaVisivel === 'glossario' && <Glossario />}
           {telaVisivel === 'leitura' && <Leitura />}
           {telaVisivel === 'ajuda' && <Ajuda />}
           {telaVisivel === 'sobre' && <Sobre />}
-          {telaVisivel === 'camera' && <Camera key={preferencias.idioma} aoAbrir={abrirCarta} aoDigitar={digitarDaCamera} />}
+          {telaVisivel === 'camera' && <Camera key={preferencias.idioma} aoAbrir={abrirCarta} aoDigitar={digitarDaCamera} aoReportar={(quadro) => void reportar(c.camera, quadro)} />}
+          {telaVisivel === 'contato' && <Contato contexto={contextoContato} />}
         </main>
         <Rodape />
         <SetaTopo key={telaVisivel} />

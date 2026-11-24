@@ -1,3 +1,4 @@
+import { CONTATO } from '../i18n/contato'
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { prepararLeitor } from '../api/ocr'
 import { buscarCarta, SemConexao, ServicoDeCartasIndisponivel } from '../api/scryfall'
@@ -68,8 +69,14 @@ function fotografar(video: HTMLVideoElement) {
   return quadro
 }
 
-export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void; aoDigitar: () => void }) {
+export function Camera({ aoAbrir, aoDigitar, aoReportar }: {
+  aoAbrir: (carta: Card, quadro?: HTMLCanvasElement | File) => void
+  aoDigitar: () => void
+  aoReportar: (quadro?: HTMLCanvasElement | File) => void
+}) {
   const { t, preferencias } = usePreferencias()
+  const c = CONTATO[preferencias.idioma]
+  const ultimoQuadro = useRef<HTMLCanvasElement | File | undefined>(undefined)
   const [estado, setEstado] = useState<Estado>('abrindo')
   const [mensagem, setMensagem] = useState(t.camera.abrindo)
   const [temCamera, setTemCamera] = useState(false)
@@ -190,6 +197,7 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
           setMensagem(t.camera.lendo)
         }
         const quadro = fotografar(video)
+        ultimoQuadro.current = quadro
         try {
           const diagnostico: Diagnostico = { dica: null }
           const carta = await identificarCarta(quadro, quadro.width, quadro.height, preferencias.idioma, { diagnostico, rapido: true, anteriores })
@@ -199,7 +207,7 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
             avisarQueReconheceu()
             setMensagem(t.camera.carregandoFicha)
             const ficha = await buscarCarta(carta.nome, preferencias.idioma)
-            if (ativo) abrirRef.current(ficha)
+            if (ativo) abrirRef.current(ficha, quadro)
             return
           }
           if (diagnostico.dica) {
@@ -240,10 +248,19 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
     }
   }
 
+  function escolherFoto(capturar: boolean) {
+    const entrada = fotoRef.current
+    if (!entrada) return
+    if (capturar) entrada.setAttribute('capture', 'environment')
+    else entrada.removeAttribute('capture')
+    entrada.click()
+  }
+
   async function lerDaFoto(evento: ChangeEvent<HTMLInputElement>) {
     const arquivo = evento.target.files?.[0]
     evento.target.value = ''
     if (!arquivo) return
+    ultimoQuadro.current = arquivo
     const sessao = sessaoRef.current?.signal
     const anterior = estado
     setLendoQuadros(false)
@@ -261,7 +278,7 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
       if (carta) {
         avisarQueReconheceu()
         const ficha = await buscarCarta(carta.nome, preferencias.idioma)
-        if (!sessao?.aborted) aoAbrir(ficha)
+        if (!sessao?.aborted) aoAbrir(ficha, arquivo)
         return
       }
       setEstado(temCamera ? 'procurando' : 'erro')
@@ -313,10 +330,18 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
             type="button"
             className={temCamera ? 'botao-secundario' : 'botao-principal'}
             disabled={estado === 'lendo-foto' || buscandoPorVoz}
-            onClick={() => fotoRef.current?.click()}
+            onClick={() => escolherFoto(false)}
           >
             {t.camera.foto}
           </button>
+          <button type="button" className="botao-secundario"
+            disabled={estado === 'lendo-foto' || buscandoPorVoz} onClick={() => escolherFoto(true)}>
+            {c.tirar}
+          </button>
+          <button type="button" className="botao-secundario" onClick={() => {
+            const video = videoRef.current
+            aoReportar(ultimoQuadro.current ?? (video && video.videoWidth ? fotografar(video) : undefined))
+          }}>{c.relatar}</button>
           <input ref={fotoRef} className="visualmente-oculto" type="file" accept="image/*" tabIndex={-1} aria-hidden="true" onChange={lerDaFoto} />
         </div>
         {estado !== 'lendo-foto' && (

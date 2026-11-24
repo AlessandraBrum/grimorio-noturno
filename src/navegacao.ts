@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-export const TELAS = ['buscar', 'carta', 'glossario', 'leitura', 'ajuda', 'sobre', 'camera'] as const
+export const TELAS = ['buscar', 'carta', 'glossario', 'leitura', 'ajuda', 'sobre', 'camera', 'contato'] as const
 
 export type Tela = (typeof TELAS)[number]
 

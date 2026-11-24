@@ -1,0 +1,58 @@
+
+export const ASSUNTOS = ['sugestao', 'erro', 'agradecimento', 'parcerias', 'outros'] as const
+export type Assunto = (typeof ASSUNTOS)[number]
+
+export const CONTATO = {
+  pt: {
+    intro: 'Envie sua mensagem para Alessandra. Você também pode escrever diretamente por e-mail.',
+    assunto: 'Assunto', escolher: 'Escolha um assunto', mensagem: 'Mensagem',
+    canal: 'Como você prefere receber a resposta?', email: 'E-mail', whatsapp: 'WhatsApp',
+    numero: 'Número do WhatsApp', ddd: 'Inclua o código do país e o DDD, por exemplo +55 11 91234-5678.',
+    telefoneInvalido: 'Informe um número com o código do país e o DDD.',
+    pular: 'Pular para o formulário', obrigatorios: 'Todos os campos são obrigatórios, exceto as imagens.',
+    preparando: 'Preparando imagens…', anexadas: (n: number) => n ? (n === 1 ? '1 imagem anexada.' : `${n} imagens anexadas.`) : '',
+    imagens: 'Imagens (opcional)',
+    dica: 'Você pode escolher várias imagens e voltar para adicionar mais. Confira os anexos antes de enviar. Imagens grandes são reduzidas para caber no envio de até 3 MB por arquivo.',
+    arquivoInvalido: (nome: string) => `Não foi possível adicionar ${nome}. Escolha uma imagem de até 3 MB.`,
+    remover: 'Remover', enviar: 'Enviar mensagem', continuar: 'Continuar envio',
+    enviando: (parte: number, total: number) => `Enviando parte ${parte} de ${total}…`,
+    sucesso: 'Mensagem enviada. A resposta poderá chegar pelo canal que você escolheu.',
+    falha: 'Não foi possível enviar. Tente novamente ou escreva diretamente por e-mail.',
+    parcial: 'Parte da mensagem já foi enviada. Use Continuar envio para retomar da última parte.',
+    relatar: 'Reportar erro', tirar: 'Tirar foto da carta',
+    captura: 'captura-da-camera.jpg', origem: 'Origem', camera: 'Câmera', carta: 'Carta exibida',
+    exemplos: {
+      sugestao: ['Sugestões de melhorias', 'Acho que o aplicativo poderia melhorar em...'],
+      erro: ['Reportar erro', 'A carta que escaneei não está sendo reconhecida. Dê uma olhada nesta captura de tela.'],
+      agradecimento: ['Agradecimento', 'Muito obrigada! O aplicativo me ajudou no dia a dia da seguinte maneira:'],
+      parcerias: ['Parcerias', 'Olá, Alessandra. Eu gostaria de falar com você sobre uma parceria comercial ou acadêmica.'],
+      outros: ['Outros', 'Olá, Alessandra. Vi o Grimório Noturno online e eu gostaria de conversar com você sobre...'],
+    },
+  },
+  en: {
+    intro: 'Send Alessandra a message. You can also write to her directly by email.',
+    assunto: 'Subject', escolher: 'Choose a subject', mensagem: 'Message',
+    canal: 'How would you like to receive a reply?', email: 'Email', whatsapp: 'WhatsApp',
+    numero: 'WhatsApp number', ddd: 'Include your country and area code, for example +1 415 555 0123.',
+    telefoneInvalido: 'Enter a number with its country and area code.',
+    pular: 'Skip to the form', obrigatorios: 'All fields are required except images.',
+    preparando: 'Preparing images…', anexadas: (n: number) => n ? (n === 1 ? '1 image attached.' : `${n} images attached.`) : '',
+    imagens: 'Images (optional)',
+    dica: 'You can select multiple images and come back to add more. Check your attachments before sending. Large images are resized to fit the 3 MB limit per attachment.',
+    arquivoInvalido: (nome: string) => `Could not add ${nome}. Choose an image up to 3 MB.`,
+    remover: 'Remove', enviar: 'Send message', continuar: 'Resume sending',
+    enviando: (parte: number, total: number) => `Sending part ${parte} of ${total}…`,
+    sucesso: 'Message sent. You can receive a reply through the channel you chose.',
+    falha: 'Could not send your message. Try again or write directly by email.',
+    parcial: 'Part of your message was already sent. Use Resume sending to continue from the last part.',
+    relatar: 'Report a bug', tirar: 'Take a picture of the card',
+    captura: 'camera-snapshot.jpg', origem: 'Source', camera: 'Camera', carta: 'Displayed card',
+    exemplos: {
+      sugestao: ['Suggestions', 'I think the app could improve by...'],
+      erro: ['Report a bug', 'The card I scanned was not recognized. Please take a look at this screenshot.'],
+      agradecimento: ['Thank you', 'Thank you! The app helped me in my day-to-day life by:'],
+      parcerias: ['Partnerships', 'Hi Alessandra, I would like to talk about a business or academic partnership.'],
+      outros: ['Other', 'Hi Alessandra, I saw Grimório Noturno online and would like to talk about...'],
+    },
+  },
+}

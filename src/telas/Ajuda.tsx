@@ -26,7 +26,10 @@ export function Ajuda() {
         ))}
       </div>
 
-      <a href="#sobre">{t.ajuda.sobreLink}</a>
+      <ul className="lista-links ajuda__links">
+        <li><a className="botao-principal ajuda__contato" href="#contato">{t.abas.contato}</a></li>
+        <li><a href="#sobre">{t.ajuda.sobreLink}</a></li>
+      </ul>
       <FimDeSecao />
     </div>
   )
