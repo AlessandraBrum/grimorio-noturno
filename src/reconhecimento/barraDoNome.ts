@@ -7,6 +7,8 @@ const COLUNAS_DO_TEXTO = { x0: 0.06, x1: 0.7 }
 const ALTURA_DA_LINHA = 0.042
 const FOLGA_DA_LINHA = 0.3
 const ALTURA_DO_TEXTO = 48
+const TRACO_DEITADO = 3
+const TRACO_EM_PE = 1.3
 
 export interface Quadro {
   dados: Uint8ClampedArray
@@ -125,15 +127,20 @@ function linhaMaisProvavel(cinza: Float32Array, w: number, h: number) {
     energia[y] = soma / (x1 - x0)
   }
   const altura = Math.round(ALTURA_DA_LINHA * ALTURA_DA_CARTA)
+  const margem = Math.max(2, Math.round(altura * 0.35))
+  const acumulada = new Float32Array(h + 1)
+  for (let y = 0; y < h; y++) acumulada[y + 1] = acumulada[y] + energia[y]
+  const media = (a: number, b: number) => (a >= b ? 0 : (acumulada[b] - acumulada[a]) / (b - a))
   let melhor = 0
-  let melhorSoma = -1
-  let soma = 0
-  for (let y = 0; y < h; y++) {
-    soma += energia[y]
-    if (y >= altura) soma -= energia[y - altura]
-    if (y >= altura - 1 && soma > melhorSoma) {
-      melhorSoma = soma
-      melhor = y - altura + 1
+  let melhorNota = -Infinity
+  for (let y = 0; y + altura <= h; y++) {
+    const dentro = media(y, y + altura)
+    const acima = media(Math.max(0, y - margem), y)
+    const abaixo = media(y + altura, Math.min(h, y + altura + margem))
+    const nota = dentro - Math.max(acima, abaixo)
+    if (nota > melhorNota) {
+      melhorNota = nota
+      melhor = y
     }
   }
   return { topo: melhor, altura }
@@ -190,6 +197,35 @@ function otsu(valores: Uint8ClampedArray) {
   return limiar
 }
 
+function apagarTracos(tinta: Uint8Array, w: number, h: number, alturaDaLinha: number) {
+  const maiorDeitado = Math.round(alturaDaLinha * TRACO_DEITADO)
+  const maiorEmPe = Math.round(alturaDaLinha * TRACO_EM_PE)
+  const apagar = new Uint8Array(w * h)
+  for (let y = 0; y < h; y++) {
+    let inicio = -1
+    for (let x = 0; x <= w; x++) {
+      const cheio = x < w && tinta[y * w + x]
+      if (cheio && inicio < 0) inicio = x
+      if (!cheio && inicio >= 0) {
+        if (x - inicio > maiorDeitado) apagar.fill(1, y * w + inicio, y * w + x)
+        inicio = -1
+      }
+    }
+  }
+  for (let x = 0; x < w; x++) {
+    let inicio = -1
+    for (let y = 0; y <= h; y++) {
+      const cheio = y < h && tinta[y * w + x]
+      if (cheio && inicio < 0) inicio = y
+      if (!cheio && inicio >= 0) {
+        if (y - inicio > maiorEmPe) for (let k = inicio; k < y; k++) apagar[k * w + x] = 1
+        inicio = -1
+      }
+    }
+  }
+  for (let i = 0; i < tinta.length; i++) if (apagar[i]) tinta[i] = 0
+}
+
 function limparTinta(tinta: Uint8Array, w: number, h: number, alturaDaLinha: number) {
   const rotulos = new Int32Array(w * h).fill(-1)
   const pilha: number[] = []
@@ -229,7 +265,24 @@ function limparTinta(tinta: Uint8Array, w: number, h: number, alturaDaLinha: num
   }
 }
 
-export function recortarNome(quadro: Quadro, cantos: Ponto[]) {
+function ampliar(claro: Uint8ClampedArray, w: number, h: number, escala: number) {
+  const origem = document.createElement('canvas')
+  origem.width = w
+  origem.height = h
+  const imagem = new ImageData(w, h)
+  for (let i = 0; i < claro.length; i++) {
+    imagem.data[i * 4] = imagem.data[i * 4 + 1] = imagem.data[i * 4 + 2] = claro[i]
+    imagem.data[i * 4 + 3] = 255
+  }
+  origem.getContext('2d')?.putImageData(imagem, 0, 0)
+  const saida = document.createElement('canvas')
+  saida.width = Math.round(w * escala)
+  saida.height = Math.round(h * escala)
+  saida.getContext('2d')?.drawImage(origem, 0, 0, saida.width, saida.height)
+  return saida
+}
+
+export function recortarNome(quadro: Quadro, cantos: Ponto[], modo: 'tinta' | 'cinza' = 'tinta') {
   const { cinza, w, h } = amostrar(quadro, cantos, FAIXA_DE_BUSCA)
   const { topo, altura } = linhaMaisProvavel(cinza, w, h)
   const folga = Math.round(altura * FOLGA_DA_LINHA)
@@ -237,9 +290,11 @@ export function recortarNome(quadro: Quadro, cantos: Ponto[]) {
   const y1 = Math.min(h, topo + altura + folga)
   const alturaDoRecorte = y1 - y0
   const claro = esticarContraste(cinza.subarray(y0 * w, y1 * w))
+  if (modo === 'cinza') return ampliar(claro, w, alturaDoRecorte, ALTURA_DO_TEXTO / altura)
   const limiar = otsu(claro)
   const tinta = new Uint8Array(claro.length)
   for (let i = 0; i < claro.length; i++) if (claro[i] <= limiar) tinta[i] = 1
+  apagarTracos(tinta, w, alturaDoRecorte, altura)
   limparTinta(tinta, w, alturaDoRecorte, altura)
   const margem = Math.round(altura * 0.4)
   const origem = document.createElement('canvas')

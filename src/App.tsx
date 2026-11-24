@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { prepararLeitor } from './api/ocr'
 import { buscarCarta, CartaNaoEncontrada, SemConexao } from './api/scryfall'
 import { Cabecalho } from './components/Cabecalho'
 import { Ceu } from './components/Ceu'
@@ -7,6 +8,7 @@ import { Rodape } from './components/Rodape'
 import { SetaTopo } from './components/SetaTopo'
 import { usePreferencias } from './contexto/usePreferencias'
 import { useTela } from './navegacao'
+import { carregarCatalogo } from './reconhecimento/catalogo'
 import { Ajuda } from './telas/Ajuda'
 import { Buscar, type EstadoBusca } from './telas/Buscar'
 import { Camera } from './telas/Camera'
@@ -15,6 +17,8 @@ import { Glossario } from './telas/Glossario'
 import { Leitura } from './telas/Leitura'
 import { Sobre } from './telas/Sobre'
 import type { Card, Idioma } from './types/card'
+
+const ESPERA_PARA_AQUECER_MS = 1500
 
 export function App() {
   const { t, preferencias, lembrar } = usePreferencias()
@@ -28,6 +32,14 @@ export function App() {
   const focarBusca = useRef(false)
 
   const telaVisivel = tela === 'carta' && !carta ? 'buscar' : tela
+
+  useEffect(() => {
+    const espera = setTimeout(() => {
+      prepararLeitor().catch(() => {})
+      carregarCatalogo().catch(() => {})
+    }, ESPERA_PARA_AQUECER_MS)
+    return () => clearTimeout(espera)
+  }, [])
 
   useEffect(() => {
     const titulo = telaVisivel === 'carta' && carta ? carta.printedName ?? carta.name : t.abas[telaVisivel as keyof typeof t.abas]

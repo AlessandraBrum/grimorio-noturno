@@ -10,9 +10,8 @@ import type { Card } from '../types/card'
 
 type Estado = 'abrindo' | 'procurando' | 'sem-camera' | 'lendo-foto' | 'erro'
 
-const TEMPO_PARADO_MS = 400
-const PAUSA_ENTRE_LEITURAS_MS = 250
-const INTERVALO_DE_OBSERVACAO_MS = 100
+const TEMPO_PARADO_MS = 250
+const INTERVALO_DE_OBSERVACAO_MS = 60
 const LEITURAS_ATE_A_DICA = 4
 const BRILHO_ESCURO = 60
 const INTERVALO_DO_AVISO_DE_ESCURO_MS = 10000
@@ -149,6 +148,8 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
     let leituras = 0
     const detector = new DetectorDeEstabilidade(TEMPO_PARADO_MS)
     let ultimoAvisoDeEscuro = -Infinity
+    let avisouNestaParada = false
+    let anteriores: string[] = []
 
     async function procurarSemParar() {
       await prepararIdentificacao()
@@ -177,14 +178,23 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
           setMensagem(lanternaRef.current.existe ? t.camera.escuro : t.camera.escuroSemLuz)
           setSugerirLuz(lanternaRef.current.existe)
         }
-        if (!parada) continue
-        avisarCaptura()
-        setMensagem(t.camera.lendo)
+        if (!parada) {
+          avisouNestaParada = false
+          anteriores = []
+          continue
+        }
+        const primeiraLeitura = !avisouNestaParada
+        avisouNestaParada = true
+        if (primeiraLeitura) {
+          avisarCaptura()
+          setMensagem(t.camera.lendo)
+        }
         const quadro = fotografar(video)
         try {
           const diagnostico: Diagnostico = { dica: null }
-          const carta = await identificarCarta(quadro, quadro.width, quadro.height, preferencias.idioma, { diagnostico })
+          const carta = await identificarCarta(quadro, quadro.width, quadro.height, preferencias.idioma, { diagnostico, rapido: true, anteriores })
           if (!ativo) return
+          anteriores = diagnostico.provaveis ?? []
           if (carta) {
             avisarQueReconheceu()
             setMensagem(t.camera.carregandoFicha)
@@ -193,7 +203,7 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
             return
           }
           if (diagnostico.dica) {
-            avisarDica()
+            if (primeiraLeitura) avisarDica()
             setMensagem(diagnostico.dica === 'aproxime' ? t.camera.aproxime : t.camera.endireite)
           } else {
             leituras += 1
@@ -208,8 +218,6 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
             setMensagem(erro instanceof SemConexao ? t.buscar.semInternet : t.camera.dica)
           }
         }
-        detector.reiniciar()
-        await esperar(PAUSA_ENTRE_LEITURAS_MS)
       }
     }
 

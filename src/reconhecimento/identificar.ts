@@ -14,9 +14,15 @@ const NOME_CERTO = 0.84
 const FOLGA_ENTRE_NOMES = 0.1
 const FOLGA_COM_NOME_EXATO = 0.06
 const NOME_POSSIVEL = 0.6
+const NOME_PROVAVEL = 0.68
+const FOLGA_PROVAVEL = 0.05
 const ORCAMENTO_MS = 1600
 const CONTORNOS_TESTADOS = 2
+const NOME_CURTO = 6
+const NOME_EXATO = 0.95
+const CONFIANCA_SOZINHA = 45
 const ESPERA_PELA_ARTE_MS = 400
+const MODOS_DE_RECORTE = ['tinta', 'cinza'] as const
 const PROPORCAO_MAXIMA_DO_NOME = 24
 const CONFIANCA_PARA_BUSCAR_ONLINE = 70
 const CONFIANCA_MINIMA = 25
@@ -34,6 +40,7 @@ export type Dica = 'aproxime' | 'endireite' | null
 
 export interface Diagnostico {
   dica: Dica
+  provaveis?: string[]
 }
 
 export interface CartaIdentificada {
@@ -43,6 +50,8 @@ export interface CartaIdentificada {
 
 interface Opcoes {
   diagnostico?: Diagnostico
+  rapido?: boolean
+  anteriores?: string[]
 }
 
 function recortar(origem: CanvasImageSource, faixa: Faixa, giro: number) {
@@ -143,12 +152,18 @@ function decidir(achados: Achado[], arte: Reconhecimento | null): CartaIdentific
 
 interface Leitura {
   arte: Reconhecimento | null
-  promessaDaArte: Promise<Reconhecimento | null>
+  pedirArte: () => Promise<Reconhecimento | null>
   melhor: { texto: string; confianca: number }
+  provaveis: string[]
+  anteriores: string[]
   conflito: boolean
   inicio: number
   inclinacao: number
   catalogo: Awaited<ReturnType<typeof carregarCatalogo>>
+}
+
+function precisaConfirmar(nome: string, pontuacao: number, confianca: number) {
+  return chaveDoNome(nome).length <= NOME_CURTO || (pontuacao < NOME_EXATO && confianca < CONFIANCA_SOZINHA)
 }
 
 async function avaliarTexto(texto: string, confianca: number, leitura: Leitura) {
@@ -158,9 +173,18 @@ async function avaliarTexto(texto: string, confianca: number, leitura: Leitura) 
   const achados = procurarNoCatalogo(leitura.catalogo, texto)
   const pontuacao = achados[0]?.pontuacao ?? 0
   if (!leitura.arte && pontuacao >= NOME_POSSIVEL && pontuacao < NOME_CERTO) {
-    leitura.arte = await Promise.race([leitura.promessaDaArte, esperar(ESPERA_PELA_ARTE_MS).then(() => null)])
+    leitura.arte = await Promise.race([leitura.pedirArte(), esperar(ESPERA_PELA_ARTE_MS).then(() => null)])
   }
+  const [primeiro, segundo] = achados
+  const provavel = primeiro && primeiro.pontuacao >= NOME_PROVAVEL
+    && (!segundo || primeiro.pontuacao - segundo.pontuacao >= FOLGA_PROVAVEL)
+  if (provavel && !leitura.provaveis.includes(primeiro.nome)) leitura.provaveis.push(primeiro.nome)
   const decisao = decidir(achados, leitura.arte)
+  if (!decisao && provavel && leitura.anteriores.includes(primeiro.nome)) return { nome: primeiro.nome, porArte: false }
+  if (decisao && decisao !== 'conflito' && !decisao.porArte && precisaConfirmar(decisao.nome, pontuacao, confianca)) {
+    if (!leitura.provaveis.includes(decisao.nome)) leitura.provaveis.push(decisao.nome)
+    return leitura.anteriores.includes(decisao.nome) ? decisao : null
+  }
   if (decisao === 'conflito') {
     leitura.conflito = true
     return null
@@ -182,11 +206,14 @@ async function lerBarraDoNome(origem: CanvasImageSource, largura: number, altura
   const quadro = contornos.length ? lerQuadro(origem, largura, altura) : null
   if (!quadro) return { decisao: null, ocupacao: 0 }
   for (const contorno of contornos) {
-    for (const cantos of orientacoes(contorno.cantos)) {
-      if (performance.now() - leitura.inicio > ORCAMENTO_MS) return { decisao: null, ocupacao: contornos[0].ocupacao }
-      const { texto, confianca } = await lerLinha(recortarNome(quadro, cantos))
-      const decisao = await avaliarTexto(texto, confianca, leitura)
-      if (decisao) return { decisao, ocupacao: contorno.ocupacao }
+    const emPe = orientacoes(contorno.cantos).sort((a, b) => a[0].y + a[1].y - b[0].y - b[1].y)
+    for (const cantos of emPe) {
+      for (const modo of MODOS_DE_RECORTE) {
+        if (performance.now() - leitura.inicio > ORCAMENTO_MS) return { decisao: null, ocupacao: contornos[0].ocupacao }
+        const { texto, confianca } = await lerLinha(recortarNome(quadro, cantos, modo))
+        const decisao = await avaliarTexto(texto, confianca, leitura)
+        if (decisao) return { decisao, ocupacao: contorno.ocupacao }
+      }
     }
   }
   return { decisao: null, ocupacao: contornos[0].ocupacao }
@@ -205,6 +232,8 @@ async function lerNomes(origem: CanvasImageSource, largura: number, altura: numb
   return null
 }
 
+const buscadosOnline = new Set<string>()
+
 export function prepararIdentificacao() {
   return Promise.allSettled([carregarCatalogo(), prepararArte()])
 }
@@ -214,28 +243,44 @@ export async function identificarCarta(
   largura: number,
   altura: number,
   idioma: Idioma,
-  { diagnostico }: Opcoes = {},
+  { diagnostico, rapido = false, anteriores = [] }: Opcoes = {},
 ): Promise<CartaIdentificada | null> {
-  const [catalogo] = await Promise.all([carregarCatalogo(), prepararArte().catch(() => null)])
-  const promessaDaArte = reconhecerArte(origem, largura, altura).catch(() => null)
-  const leitura: Leitura = { arte: null, promessaDaArte, melhor: { texto: '', confianca: 0 }, conflito: false, inicio: performance.now(), inclinacao: 0, catalogo }
-  void promessaDaArte.then((arte) => {
-    leitura.arte = arte
-  })
+  const catalogo = await carregarCatalogo()
+  let promessaDaArte: Promise<Reconhecimento | null> | null = null
+  const leitura: Leitura = {
+    arte: null,
+    pedirArte: () => {
+      promessaDaArte ??= reconhecerArte(origem, largura, altura).catch(() => null)
+      return promessaDaArte
+    },
+    melhor: { texto: '', confianca: 0 },
+    provaveis: [],
+    anteriores,
+    conflito: false,
+    inicio: performance.now(),
+    inclinacao: 0,
+    catalogo,
+  }
 
   const { decisao: pelaBarra, ocupacao } = await lerBarraDoNome(origem, largura, altura, leitura)
   if (pelaBarra) return pelaBarra
-  const pelasLinhas = await lerNomes(origem, largura, altura, leitura)
-  if (pelasLinhas) return pelasLinhas
+  if (!rapido) {
+    const pelasLinhas = await lerNomes(origem, largura, altura, leitura)
+    if (pelasLinhas) return pelasLinhas
+  }
   if (diagnostico) {
+    diagnostico.provaveis = leitura.provaveis
     diagnostico.dica = ocupacao > 0 && ocupacao < CARTA_PEQUENA ? 'aproxime'
       : Math.abs(leitura.inclinacao) >= CARTA_TORTA_GRAUS ? 'endireite' : null
   }
   const { melhor: melhorLeitura, conflito } = leitura
 
-  if (!conflito && idioma === 'pt' && melhorLeitura.confianca >= CONFIANCA_PARA_BUSCAR_ONLINE) {
+  const chaveOnline = chaveDoNome(melhorLeitura.texto)
+  if (!conflito && melhorLeitura.confianca >= CONFIANCA_PARA_BUSCAR_ONLINE && chaveOnline.length >= 4 && !buscadosOnline.has(chaveOnline)) {
+    buscadosOnline.add(chaveOnline)
     try {
       const { nomes, certeza } = await identificarCandidatos([melhorLeitura.texto], idioma, 'camera')
+      leitura.arte ??= await leitura.pedirArte()
       const arteContra = arteConfiavel(leitura.arte, 12, 8) && leitura.arte!.nome !== nomes[0]
       if (certeza && nomes[0] && !arteContra) return { nome: nomes[0], porArte: false }
     } catch {

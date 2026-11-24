@@ -1,7 +1,9 @@
-const LADO_DE_ANALISE = 360
+const LADO_DE_ANALISE = 640
 const ANGULOS = 180
 const VIZINHANCA_ANGULAR = 3
-const PICOS = 28
+const PICOS = 48
+const RAIO_DE_SUPRESSAO = 0.005
+const VOTOS_MINIMOS = 0.12
 const PARALELAS_GRAUS = 14
 const PROPORCAO_DA_CARTA = 88 / 63
 const TOLERANCIA_DA_PROPORCAO = 0.3
@@ -100,8 +102,8 @@ function votar(borda: Uint8Array, direcao: Int16Array, w: number, h: number) {
     }
   }
   const retas: Reta[] = []
-  const raioRho = Math.max(4, Math.round(diagonal * 0.02))
-  const minimo = Math.min(w, h) * 0.12
+  const raioRho = Math.max(4, Math.round(diagonal * RAIO_DE_SUPRESSAO))
+  const minimo = Math.min(w, h) * VOTOS_MINIMOS
   for (let t = 0; t < ANGULOS; t++) {
     for (let r = 0; r < linhas; r++) {
       const v = votos[t * linhas + r]

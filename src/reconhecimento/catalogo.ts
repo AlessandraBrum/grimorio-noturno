@@ -4,6 +4,9 @@ const CANDIDATOS = 250
 const SOBRA_NO_INICIO = 2
 const SOBRA_NO_FIM = 3
 const NOME_CURTO = 5
+const VALIDADE_DO_CATALOGO_MS = 14 * 24 * 60 * 60 * 1000
+const PARTE_MINIMA = 8
+const COBERTURA_MINIMA = 0.6
 const NOME_INCOMPLETO = /_|-$/
 
 interface Catalogo {
@@ -21,6 +24,11 @@ let catalogo: Promise<Catalogo> | null = null
 
 function hoje() {
   return new Date().toISOString().slice(0, 10)
+}
+
+function aindaValido(dia: string) {
+  const idade = Date.now() - Date.parse(dia)
+  return idade >= 0 && idade < VALIDADE_DO_CATALOGO_MS
 }
 
 export function chaveDoNome(texto: string) {
@@ -73,7 +81,7 @@ async function baixarDaBaseLocal() {
 
 async function obterNomes() {
   const guardado = lerGuardado()
-  if (guardado?.dia === hoje()) return guardado.nomes
+  if (guardado && aindaValido(guardado.dia)) return guardado.nomes
   try {
     const nomes = await baixarDoScryfall()
     guardar(nomes)
@@ -148,10 +156,34 @@ function custoDeAlinhar(nome: string, texto: string) {
   return melhor
 }
 
+function custoDentroDoNome(nome: string, texto: string) {
+  let anterior = new Float32Array(nome.length + 1)
+  let atual = new Float32Array(nome.length + 1)
+  for (let i = 1; i <= texto.length; i++) {
+    atual[0] = i
+    for (let j = 1; j <= nome.length; j++) {
+      const troca = anterior[j - 1] + (texto[i - 1] === nome[j - 1] ? 0 : 1)
+      atual[j] = Math.min(troca, anterior[j] + 1, atual[j - 1] + 1)
+    }
+    ;[anterior, atual] = [atual, anterior]
+  }
+  let melhor = Infinity
+  for (let j = 0; j <= nome.length; j++) if (anterior[j] < melhor) melhor = anterior[j]
+  return melhor
+}
+
+function pontuarParte(nome: string, texto: string) {
+  if (texto.length < PARTE_MINIMA || texto.length >= nome.length) return 0
+  const cobertura = texto.length / nome.length
+  if (cobertura < COBERTURA_MINIMA) return 0
+  const acerto = 1 - custoDentroDoNome(nome, texto) / texto.length
+  return acerto * (0.75 + 0.25 * cobertura)
+}
+
 function pontuar(nome: string, texto: string) {
   const pontuacao = 1 - custoDeAlinhar(nome, texto) / nome.length
   if (nome.length <= NOME_CURTO && (pontuacao < 1 || texto.length > nome.length + 1)) return Math.min(pontuacao, 0.5)
-  return pontuacao
+  return Math.max(pontuacao, pontuarParte(nome, texto))
 }
 
 export function procurarNoCatalogo(dados: Catalogo, lido: string): Achado[] {
