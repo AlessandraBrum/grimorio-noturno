@@ -1,6 +1,4 @@
 
-import nodemailer from 'nodemailer'
-
 const DESTINO = 'ambuxedev@gmail.com'
 const ASSUNTOS = {
   sugestao: 'Sugestões de melhorias',
@@ -23,9 +21,9 @@ export default {
 
     const tamanho = Number(request.headers.get('content-length'))
     if (!Number.isSafeInteger(tamanho) || tamanho <= 0 || tamanho > LIMITE_REQUISICAO) return json(413)
-    const usuario = process.env.CONTATO_GMAIL_USUARIO
-    const senha = process.env.CONTATO_GMAIL_SENHA_APP?.replace(/\s/g, '')
-    if (!usuario || !senha) return json(503)
+    const chave = process.env.RESEND_API_KEY?.trim()
+    const remetente = process.env.CONTATO_EMAIL_REMETENTE?.trim()
+    if (!chave || !remetente) return json(503)
 
     let dados
     try {
@@ -67,30 +65,29 @@ export default {
       `Resposta por ${canal === 'email' ? 'e-mail' : 'WhatsApp'}: ${resposta}`,
       origem && `Origem: ${origem}`,
     ].filter(Boolean).join('\n')
-    const transporte = nodemailer.createTransport({
-      service: 'gmail',
-      auth: { user: usuario, pass: senha },
-      connectionTimeout: 12_000,
-      greetingTimeout: 12_000,
-      socketTimeout: 20_000,
-      disableFileAccess: true,
-      disableUrlAccess: true,
-    })
     try {
-      await transporte.sendMail({
-        from: { name: 'Grimório Noturno', address: usuario },
-        to: DESTINO,
-        replyTo: canal === 'email' ? { address: resposta, name: '' } : undefined,
-        subject: `[Grimório ${referencia}] ${ASSUNTOS[assunto]} (${parte}/${total})`,
-        messageId: `<${id}.${parte}@grimorio-noturno.local>`,
-        text: `${detalhes}\n\n${mensagem ?? 'Imagem em anexo.'}`,
-        attachments: imagem ? [{
-          // oxlint-disable-next-line no-control-regex
-          filename: imagem.name.replace(/[\x00-\x1f\x7f/\\]/g, '_').slice(0, 240) || 'imagem',
-          content: Buffer.from(await imagem.arrayBuffer()),
-          contentType: 'application/octet-stream',
-        }] : undefined,
+      const resultado = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${chave}`,
+          'Content-Type': 'application/json',
+          'Idempotency-Key': `grimorio-noturno/${id}/${parte}`,
+        },
+        signal: AbortSignal.timeout(25_000),
+        body: JSON.stringify({
+          from: `Grimório Noturno <${remetente}>`,
+          to: [DESTINO],
+          reply_to: canal === 'email' ? resposta : undefined,
+          subject: `[Grimório ${referencia}] ${ASSUNTOS[assunto]} (${parte}/${total})`,
+          text: `${detalhes}\n\n${mensagem ?? 'Imagem em anexo.'}`,
+          attachments: imagem ? [{
+            // oxlint-disable-next-line no-control-regex
+            filename: imagem.name.replace(/[\x00-\x1f\x7f/\\]/g, '_').slice(0, 240) || 'imagem',
+            content: Buffer.from(await imagem.arrayBuffer()).toString('base64'),
+          }] : undefined,
+        }),
       })
+      if (!resultado.ok) return json(502)
       return json(200, { enviado: true })
     } catch {
       return json(502)

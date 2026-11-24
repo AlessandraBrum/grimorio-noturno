@@ -105,14 +105,12 @@ incluem uma captura quando houver. A captura só é transmitida ao enviar.
 
 ### Ativar o envio na Vercel
 
-1. Ative a verificação em duas etapas na conta Google usada para enviar.
-2. [Crie uma senha de app no Google](https://myaccount.google.com/apppasswords)
-   com um nome como **Grimório Noturno**.
-3. No projeto existente da Vercel, abra **Settings → Environment Variables**.
-   Adicione `CONTATO_GMAIL_USUARIO` com o endereço Gmail correspondente à senha
-   e `CONTATO_GMAIL_SENHA_APP` com a senha de app. Use o ambiente Production
-   ou Preview, de acordo com onde você vai testar. Guarde a senha apenas no
-   ambiente do servidor.
+1. [Verifique um domínio de envio no Resend](https://resend.com/docs/dashboard/domains/introduction).
+2. [Crie uma chave de API no Resend](https://resend.com/api-keys) com permissão de envio.
+3. Na Vercel, em **Settings → Environment Variables**, adicione
+   `RESEND_API_KEY` com essa chave e `CONTATO_EMAIL_REMETENTE` com um endereço
+   do domínio verificado. Selecione Production ou Preview conforme o ambiente
+   onde vai testar. Guarde a chave apenas no servidor.
 4. Faça um novo deploy para a Vercel carregar as variáveis. O Vite sozinho
    renderiza a página local, e a função `/api/contato` roda na Vercel.
 5. Abra o formulário no deploy e envie uma mensagem com duas imagens.
