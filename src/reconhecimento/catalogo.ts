@@ -84,32 +84,44 @@ async function obterNomes() {
   }
 }
 
-function indexar(nomesCompletos: string[]): Catalogo {
+async function obterNomesEmPortugues(): Promise<Record<string, string>> {
+  try {
+    const resposta = await fetch(`${import.meta.env.BASE_URL}cartas/nomes-pt.json`)
+    if (!resposta.ok) return {}
+    return await resposta.json()
+  } catch {
+    return {}
+  }
+}
+
+function indexar(nomesCompletos: string[], emPortugues: Record<string, string>): Catalogo {
   const nomes: string[] = []
   const chaves: string[] = []
   const trigramas = new Map<string, number[]>()
   const vistos = new Set<string>()
-  for (const completo of nomesCompletos) {
-    for (const face of completo.split(' // ')) {
-      if (NOME_INCOMPLETO.test(face)) continue
-      const chave = chaveDoNome(face)
-      if (chave.length < 3 || vistos.has(chave)) continue
-      vistos.add(chave)
-      const indice = nomes.length
-      nomes.push(face)
-      chaves.push(chave)
-      for (const trigrama of new Set(trigramasDe(chave))) {
-        const lista = trigramas.get(trigrama)
-        if (lista) lista.push(indice)
-        else trigramas.set(trigrama, [indice])
-      }
+  const incluir = (impresso: string, nome: string) => {
+    if (NOME_INCOMPLETO.test(impresso)) return
+    const chave = chaveDoNome(impresso)
+    if (chave.length < 3 || vistos.has(chave)) return
+    vistos.add(chave)
+    const indice = nomes.length
+    nomes.push(nome)
+    chaves.push(chave)
+    for (const trigrama of new Set(trigramasDe(chave))) {
+      const lista = trigramas.get(trigrama)
+      if (lista) lista.push(indice)
+      else trigramas.set(trigrama, [indice])
     }
   }
+  for (const completo of nomesCompletos) {
+    for (const face of completo.split(' // ')) incluir(face, face)
+  }
+  for (const [impresso, nome] of Object.entries(emPortugues)) incluir(impresso, nome)
   return { nomes, chaves, trigramas }
 }
 
 export function carregarCatalogo() {
-  catalogo ??= obterNomes().then(indexar)
+  catalogo ??= Promise.all([obterNomes(), obterNomesEmPortugues()]).then(([nomes, emPortugues]) => indexar(nomes, emPortugues))
   catalogo.catch(() => {
     catalogo = null
   })
