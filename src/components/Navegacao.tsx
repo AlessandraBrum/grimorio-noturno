@@ -8,6 +8,7 @@ const ITENS = [
   { tela: 'leitura', icone: 'leitura', soDesktop: false },
   { tela: 'ajuda', icone: 'ajuda', soDesktop: false },
   { tela: 'sobre', icone: 'sobre', soDesktop: true },
+  { tela: 'contato', icone: 'contato', soDesktop: true },
 ] as const
 
 export function Navegacao({ tela }: { tela: Tela }) {
