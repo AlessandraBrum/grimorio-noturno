@@ -2,7 +2,7 @@ import enderecoDoLeitor from 'tesseract.js/dist/worker.min.js?url'
 import type { Worker } from 'tesseract.js'
 
 const PASTA_DO_LEITOR = `${import.meta.env.BASE_URL}leitor`
-const LETRAS_PERMITIDAS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz,'- "
+const LETRAS_PERMITIDAS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzÁÂÃÀÉÊÍÓÔÕÚÜÇáâãàéêíóôõúüç0123456789,.'’+- "
 
 export interface LeituraDeLinha {
   texto: string
@@ -15,7 +15,7 @@ let avisarProgresso: (porcentagem: number) => void = () => {}
 export function prepararLeitor(aoProgredir?: (porcentagem: number) => void) {
   if (aoProgredir) avisarProgresso = aoProgredir
   leitor ??= import('tesseract.js').then(async ({ createWorker, PSM }) => {
-    const tesseract = await createWorker('eng', 1, {
+    const tesseract = await createWorker(['eng', 'por'], 1, {
       workerPath: enderecoDoLeitor,
       workerBlobURL: false,
       corePath: PASTA_DO_LEITOR,

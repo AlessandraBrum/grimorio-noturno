@@ -10,11 +10,10 @@ import type { Card } from '../types/card'
 
 type Estado = 'abrindo' | 'procurando' | 'sem-camera' | 'lendo-foto' | 'erro'
 
-const TEMPO_PARADO_MS = 800
-const PAUSA_ENTRE_LEITURAS_MS = 1500
+const TEMPO_PARADO_MS = 400
+const PAUSA_ENTRE_LEITURAS_MS = 250
 const INTERVALO_DE_OBSERVACAO_MS = 100
-const LEITURAS_ATE_A_DICA = 3
-const PAUSA_ANTES_DE_CONFIRMAR_MS = 120
+const LEITURAS_ATE_A_DICA = 4
 const BRILHO_ESCURO = 60
 const INTERVALO_DO_AVISO_DE_ESCURO_MS = 10000
 
@@ -187,19 +186,11 @@ export function Camera({ aoAbrir, aoDigitar }: { aoAbrir: (carta: Card) => void;
           const carta = await identificarCarta(quadro, quadro.width, quadro.height, preferencias.idioma, { diagnostico })
           if (!ativo) return
           if (carta) {
-            setMensagem(t.camera.confirmando)
-            await esperar(PAUSA_ANTES_DE_CONFIRMAR_MS)
-            if (!ativo) return
-            const segundo = fotografar(video)
-            const confirmacao = await identificarCarta(segundo, segundo.width, segundo.height, preferencias.idioma, { pista: carta.pista })
-            if (!ativo) return
-            if (confirmacao?.nome === carta.nome) {
-              avisarQueReconheceu()
-              setMensagem(t.camera.carregandoFicha)
-              const ficha = await buscarCarta(carta.nome, preferencias.idioma)
-              if (ativo) abrirRef.current(ficha)
-              return
-            }
+            avisarQueReconheceu()
+            setMensagem(t.camera.carregandoFicha)
+            const ficha = await buscarCarta(carta.nome, preferencias.idioma)
+            if (ativo) abrirRef.current(ficha)
+            return
           }
           if (diagnostico.dica) {
             avisarDica()
