@@ -105,6 +105,8 @@ const pt = {
     velocidade: 'Velocidade',
     velocidadeFalada: (v: number) => `${v.toLocaleString('pt-BR')} vez${v === 1 ? '' : 'es'} a velocidade normal`,
     velocidadeCurta: (v: number) => `${v.toLocaleString('pt-BR')}x`,
+    velocidadeBotao: (v: number) =>
+      `Velocidade ${v.toLocaleString('pt-BR')}x, ${v.toLocaleString('pt-BR')} vez${v === 1 ? '' : 'es'} a velocidade normal. Toque para aumentar.`,
     indisponivel: 'Este navegador não tem leitura em voz alta.',
     lerSozinho: 'Ler toda carta automaticamente',
     lerSozinhoLigado: 'Som ligado: cada carta aberta é lida em voz alta.',
@@ -317,6 +319,8 @@ const en: Textos = {
     velocidade: 'Speed',
     velocidadeFalada: (v: number) => `${v.toLocaleString('en-US')} times normal speed`,
     velocidadeCurta: (v: number) => `${v.toLocaleString('en-US')}x`,
+    velocidadeBotao: (v: number) =>
+      `Speed ${v.toLocaleString('en-US')}x, ${v.toLocaleString('en-US')} times normal speed. Tap to increase.`,
     indisponivel: 'This browser can’t read aloud.',
     lerSozinho: 'Read every card automatically',
     lerSozinhoLigado: 'Sound on: every card you open is read aloud.',

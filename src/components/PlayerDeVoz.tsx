@@ -1,11 +1,14 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { usePreferencias } from '../contexto/usePreferencias'
 import { useLeitura, VELOCIDADE_MAXIMA, VELOCIDADE_MINIMA } from '../hooks/useLeitura'
 import { Icone } from './Icone'
 
+const VELOCIDADES = [0.5, 1, 1.5, 2, 3, 5, 10]
+
 export function PlayerDeVoz({ texto, idiomaDaFala }: { texto: string; idiomaDaFala: string }) {
   const { t, preferencias, mudar } = usePreferencias()
   const leitura = useLeitura()
+  const [velocidadeAnunciada, setVelocidadeAnunciada] = useState('')
 
   function lerAgora() {
     if (!leitura.disponivel) return
@@ -35,6 +38,12 @@ export function PlayerDeVoz({ texto, idiomaDaFala }: { texto: string; idiomaDaFa
     else lerAgora()
   }
 
+  function aumentarVelocidade() {
+    const proxima = VELOCIDADES.find((opcao) => opcao > leitura.velocidade) ?? VELOCIDADES[0]
+    leitura.setVelocidade(proxima)
+    setVelocidadeAnunciada(t.player.velocidadeFalada(proxima))
+  }
+
   function alternarSom() {
     if (preferencias.lerSozinho) leitura.parar()
     mudar('lerSozinho', !preferencias.lerSozinho)
@@ -51,20 +60,28 @@ export function PlayerDeVoz({ texto, idiomaDaFala }: { texto: string; idiomaDaFa
       <p className="player__estado" role="status">
         {estadoFalado}
       </p>
-      <div className="player__velocidade">
-        <label htmlFor="velocidade">{t.player.velocidade}</label>
-        <input
-          id="velocidade"
-          type="range"
-          min={VELOCIDADE_MINIMA}
-          max={VELOCIDADE_MAXIMA}
-          step={0.25}
-          value={leitura.velocidade}
-          aria-valuetext={t.player.velocidadeFalada(leitura.velocidade)}
-          onChange={(evento) => leitura.setVelocidade(Number(evento.target.value))}
-        />
-        <output htmlFor="velocidade">{t.player.velocidadeCurta(leitura.velocidade)}</output>
-      </div>
+      <button
+        type="button"
+        className="player__velocidade"
+        aria-label={t.player.velocidadeBotao(leitura.velocidade)}
+        onClick={aumentarVelocidade}
+      >
+        {t.player.velocidade} <strong>{t.player.velocidadeCurta(leitura.velocidade)}</strong>
+      </button>
+      <input
+        className="player__deslize"
+        type="range"
+        min={VELOCIDADE_MINIMA}
+        max={VELOCIDADE_MAXIMA}
+        step={0.5}
+        value={leitura.velocidade}
+        aria-label={t.player.velocidade}
+        aria-valuetext={t.player.velocidadeFalada(leitura.velocidade)}
+        onChange={(evento) => leitura.setVelocidade(Number(evento.target.value))}
+      />
+      <span className="visualmente-oculto" role="status">
+        {velocidadeAnunciada}
+      </span>
       <button
         type="button"
         className="botao-redondo player__som"

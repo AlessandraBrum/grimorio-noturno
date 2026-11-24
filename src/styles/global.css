@@ -877,6 +877,10 @@ body::before {
     background: color-mix(in srgb, var(--vinho) 75%, #000);
   }
 
+  .player__velocidade:hover {
+    background: var(--veu-alto);
+  }
+
   .player__som[aria-pressed="true"]:hover {
     background: color-mix(in srgb, var(--vinho) 75%, #000);
     color: var(--sobre-vinho);
@@ -906,7 +910,7 @@ body::before {
 }
 
 .app:has(.carta__player) .seta-topo {
-  bottom: calc(196px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(260px + env(safe-area-inset-bottom, 0px));
 }
 
 .carta__player .player {
@@ -914,11 +918,12 @@ body::before {
   grid-template-columns: auto minmax(0, 1fr) auto auto;
   grid-template-areas:
     "botao estado som parar"
-    "botao velocidade som parar";
+    "botao velocidade som parar"
+    "deslize deslize deslize deslize";
   column-gap: var(--espaco-3);
-  row-gap: 0;
-  padding: 6px 8px 6px 6px;
-  border-radius: var(--raio-pilula);
+  row-gap: 2px;
+  padding: 8px 12px;
+  border-radius: var(--raio-lg);
   line-height: 1.3;
 }
 
@@ -932,16 +937,18 @@ body::before {
   grid-area: estado;
 }
 
-.carta__player .player__velocidade {
-  grid-area: velocidade;
-  gap: var(--espaco-2);
-  font-size: 0.9375rem;
-  color: var(--tinta-suave);
+.carta__player .player__deslize {
+  grid-area: deslize;
+  width: 100%;
+  margin-top: 4px;
 }
 
-.carta__player .player__velocidade input {
-  min-height: 32px;
+.carta__player .player__velocidade {
+  grid-area: velocidade;
+  justify-self: start;
+  font-size: 0.9375rem;
 }
+
 
 .carta__player .player > .player__parar {
   grid-area: parar;
@@ -1118,17 +1125,31 @@ body::before {
 }
 
 .player__velocidade {
-  flex: 1 1 200px;
-  display: flex;
+  flex: none;
+  display: inline-flex;
   align-items: center;
-  gap: var(--espaco-3);
-  min-width: 0;
+  gap: var(--espaco-2);
+  min-height: 44px;
+  padding: 0 var(--espaco-3);
+  border: 2px solid var(--rosa);
+  border-radius: var(--raio-pilula);
+  background: transparent;
+  color: var(--tinta);
+  font: inherit;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
 }
 
-.player__velocidade input {
-  flex: 1;
+.player__velocidade strong {
+  font-weight: 800;
+}
+
+.player__deslize {
+  flex: 1 1 160px;
   min-width: 0;
   min-height: 44px;
+  margin: 0;
   accent-color: var(--rosa);
 }
 
@@ -1538,7 +1559,6 @@ body::before {
 
   .carta__player .player__velocidade {
     font-size: inherit;
-    color: inherit;
   }
 
   .cabecalho__celular {
