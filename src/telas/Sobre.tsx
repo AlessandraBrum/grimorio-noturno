@@ -13,7 +13,7 @@ const LINKS_DA_AUTORA = [
   { chave: 'lunaSite', href: LUNA_SOFTWARES },
 ] as const
 
-const EMAIL_DE_CONTATO = 'alessandrabrumcontato@gmail.com'
+const EMAIL_DE_CONTATO = 'ambuxedev@gmail.com'
 
 function LinkExterno({ href, texto, aviso, className }: { href: string; texto: string; aviso: string; className?: string }) {
   return (

@@ -10,7 +10,7 @@ export interface ContextoContato {
   imagem?: File
 }
 
-const EMAIL_PUBLICO = 'alessandrabrumcontato@gmail.com'
+const EMAIL_PUBLICO = 'ambuxedev@gmail.com'
 const TELEFONE = /^\+[1-9]\d{7,14}$/
 const EMAIL = /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/
 
@@ -141,7 +141,7 @@ export function Contato({ contexto }: { contexto?: ContextoContato }) {
     <div className="tela contato">
       <div className="tela__topo">
         <h1 id="titulo-tela" className="titulo-tela" tabIndex={-1}>{t.abas.contato}</h1>
-        <p className="texto-apoio">{c.intro} <a href={`mailto:${EMAIL_PUBLICO}`}>{EMAIL_PUBLICO}</a></p>
+        <p className="texto-apoio">{c.intro} <span className="quebra-livre">{EMAIL_PUBLICO}</span></p>
       </div>
       <form className="contato__form" noValidate onSubmit={enviar}>
         <p>{c.obrigatorios}</p>
