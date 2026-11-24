@@ -1,3 +1,4 @@
+import { NomeDoJogo } from './NomeDoJogo'
 import { usePreferencias } from '../contexto/usePreferencias'
 
 export function Rodape() {
@@ -9,7 +10,7 @@ export function Rodape() {
         <p>
           {t.rodape.luna} <a href="#sobre">{t.abas.sobre}</a> · <a href="#contato">{t.abas.contato}</a>
         </p>
-        <p>{t.rodape.aviso}</p>
+        <p><NomeDoJogo texto={t.rodape.aviso} /></p>
         <p className="rodape__versao">
           {t.rodape.versao} <code>{__VERSAO__}</code>
         </p>

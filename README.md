@@ -110,13 +110,14 @@ incluem uma captura quando houver. A captura só é transmitida ao enviar.
    com um nome como **Grimório Noturno**.
 3. No projeto existente da Vercel, abra **Settings → Environment Variables**.
    Adicione `CONTATO_GMAIL_USUARIO` com o endereço Gmail correspondente à senha
-   e `CONTATO_GMAIL_SENHA_APP` com a senha de app. Use o ambiente Production
+   e `CONTATO_GMAIL_SENHA_APP` com a senha de app. Adicione `CONTATO_DESTINO` com o
+   e-mail que vai receber as mensagens. Sem ela, as mensagens chegam no próprio Gmail que envia. Use o ambiente Production
    ou Preview, de acordo com onde você vai testar. Guarde a senha apenas no
    ambiente do servidor.
 4. Faça um novo deploy para a Vercel carregar as variáveis. O Vite sozinho
    renderiza a página local, e a função `/api/contato` roda na Vercel.
 5. Abra o formulário no deploy e envie uma mensagem com duas imagens.
-   Confira a chegada em `ambuxedev@gmail.com` e teste o botão **Responder**.
+   Confira a chegada no e-mail de `CONTATO_DESTINO` e teste o botão **Responder**.
    Teste também a opção WhatsApp, que inclui o número internacional no corpo
    para você abrir uma conversa e responder manualmente.
 
@@ -128,7 +129,6 @@ ou PNG e tente novamente. Se uma
 parte falhar, o botão **Continuar envio** retoma das partes ainda sem confirmação
 enquanto a página estiver aberta. O Gmail aplica suas próprias cotas de envio.
 
-A rota aceita apenas envios da origem do site e encaminha para um destinatário
-fixo. Para reduzir spam em produção, configure uma regra de limitação por IP
-para `POST /api/contato` no Firewall da Vercel, com margem para múltiplas partes
-do mesmo formulário.
+A rota aceita apenas envios da origem do site e encaminha para o destinatário
+de `CONTATO_DESTINO`. Contra spam, há um campo escondido que robôs preenchem e
+um limite de 60 partes a cada 10 minutos por IP.

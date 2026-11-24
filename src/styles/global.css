@@ -65,6 +65,25 @@ select {
   outline-offset: 3px;
 }
 
+:root {
+  scrollbar-color: var(--rolagem-barra) var(--rolagem-trilho);
+}
+
+::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--rolagem-trilho);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--rolagem-barra);
+  border: 3px solid var(--rolagem-trilho);
+  border-radius: var(--raio-pilula);
+}
+
 .visualmente-oculto {
   position: absolute;
   width: 1px;
@@ -1755,26 +1774,79 @@ body::before {
   font: inherit;
 }
 
-.contato__select {
-  appearance: none;
-  padding-inline-end: var(--espaco-6);
-}
-
-.contato__assunto {
+.seletor {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  width: 100%;
 }
 
-.contato__assunto::after {
-  content: '';
+.seletor__caixa {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+  cursor: pointer;
+  user-select: none;
+}
+
+.seletor__caixa[aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.seletor__vazio {
+  color: var(--tinta-suave);
+}
+
+.seletor__seta {
+  flex-shrink: 0;
+  color: var(--rosa);
+}
+
+.seletor__caixa[aria-expanded="true"] .seletor__seta {
+  transform: rotate(180deg);
+}
+
+.seletor__lista {
   position: absolute;
-  inset-inline-end: var(--espaco-4);
-  inset-block-end: 1.55rem;
-  width: .5rem;
-  height: .5rem;
-  border-right: 2px solid currentColor;
-  border-bottom: 2px solid currentColor;
-  transform: rotate(45deg);
-  pointer-events: none;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  margin: var(--espaco-2) 0 0;
+  padding: var(--espaco-2);
+  list-style: none;
+  max-height: 22rem;
+  overflow-y: auto;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-md);
+  background: var(--veu-alto);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 45%);
+}
+
+.seletor__lista[hidden] {
+  display: none;
+}
+
+.seletor__opcao {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+  padding: var(--espaco-2) var(--espaco-4);
+  border-radius: var(--raio-sm);
+  color: var(--tinta);
+  cursor: pointer;
+}
+
+.seletor__opcao--ativa {
+  background: var(--vinho);
+  color: var(--sobre-vinho);
+  outline: 2px solid var(--foco);
+  outline-offset: -2px;
 }
 
 .contato__mensagem {
@@ -1794,8 +1866,25 @@ body::before {
 .contato__exemplo {
   padding: calc(var(--espaco-4) + 1px);
   font-style: italic;
-  color: var(--tinta-suave);
+  color: var(--dica);
   pointer-events: none;
+}
+
+.contato__erro {
+  color: var(--rosa);
+  font-weight: 700;
+}
+
+.contato__form [aria-invalid="true"] {
+  border: 2px solid var(--rosa);
+}
+
+.contato__armadilha {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
 }
 
 .contato__canais label {

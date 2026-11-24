@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { NomeDoJogo } from '../components/NomeDoJogo'
 import { FimDeSecao } from '../components/SetaTopo'
 import { usePreferencias } from '../contexto/usePreferencias'
 
@@ -38,7 +39,7 @@ export function Sobre() {
 
       <section className="cartao" aria-labelledby="sobre-app">
         <h2 id="sobre-app" className="titulo-secao">{s.oQueE}</h2>
-        <p>{s.oQueETexto}</p>
+        <p><NomeDoJogo texto={s.oQueETexto} /></p>
         <a href="#contato">{t.abas.contato}</a>
       </section>
 
@@ -50,7 +51,11 @@ export function Sobre() {
             <li key={item}>{item}</li>
           ))}
         </ul>
-        <p className="texto-apoio">{s.aparelhosTestes}</p>
+        <p className="texto-apoio">
+          {s.aparelhosTestes.antes}
+          <a href="#contato">{s.aparelhosTestes.link}</a>
+          {s.aparelhosTestes.depois}
+        </p>
       </section>
 
       <section className="cartao" aria-labelledby="sobre-luna">
@@ -114,7 +119,7 @@ export function Sobre() {
 
       <section className="cartao" aria-labelledby="sobre-aviso">
         <h2 id="sobre-aviso" className="titulo-secao">{s.aviso}</h2>
-        <p>{t.rodape.aviso}</p>
+        <p><NomeDoJogo texto={t.rodape.aviso} /></p>
       </section>
       <FimDeSecao />
     </div>
