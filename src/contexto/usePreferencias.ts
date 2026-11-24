@@ -16,6 +16,7 @@ export interface Preferencias {
   tamanho: Tamanho
   espacamento: Espacamento
   contraste: Contraste
+  velocidade: number
 }
 
 export const TAMANHOS_EM_REM: Record<Tamanho, string> = {
@@ -34,6 +35,7 @@ export const PADRAO: Preferencias = {
   tamanho: 'grande',
   espacamento: 'normal',
   contraste: 'padrao',
+  velocidade: 1,
 }
 
 export interface ValorDoContexto {

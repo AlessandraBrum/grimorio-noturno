@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { usePreferencias } from '../contexto/usePreferencias'
-import { useLeitura } from '../hooks/useLeitura'
+import { useLeitura, VELOCIDADE_MAXIMA, VELOCIDADE_MINIMA } from '../hooks/useLeitura'
 import { Icone } from './Icone'
 
 export function PlayerDeVoz({ texto, idiomaDaFala }: { texto: string; idiomaDaFala: string }) {
@@ -56,14 +56,14 @@ export function PlayerDeVoz({ texto, idiomaDaFala }: { texto: string; idiomaDaFa
         <input
           id="velocidade"
           type="range"
-          min={0.5}
-          max={2}
+          min={VELOCIDADE_MINIMA}
+          max={VELOCIDADE_MAXIMA}
           step={0.25}
           value={leitura.velocidade}
           aria-valuetext={t.player.velocidadeFalada(leitura.velocidade)}
           onChange={(evento) => leitura.setVelocidade(Number(evento.target.value))}
         />
-        <output htmlFor="velocidade">{leitura.velocidade}x</output>
+        <output htmlFor="velocidade">{t.player.velocidadeCurta(leitura.velocidade)}</output>
       </div>
       <button
         type="button"
