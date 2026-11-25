@@ -931,9 +931,7 @@ body::before {
 .carta__player .player {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto auto auto;
-  grid-template-areas:
-    "menos painel mais som botao"
-    "deslize deslize deslize deslize deslize";
+  grid-template-areas: "menos painel mais som botao";
   align-items: center;
   column-gap: var(--espaco-3);
   row-gap: 2px;
@@ -958,12 +956,6 @@ body::before {
 
 .carta__player .player__mais-rapido {
   grid-area: mais;
-}
-
-.carta__player .player__deslize {
-  grid-area: deslize;
-  width: 100%;
-  margin-top: 4px;
 }
 
 .carta__player .player__velocidade {
@@ -1160,14 +1152,6 @@ body::before {
 
 .player__velocidade strong {
   font-weight: 800;
-}
-
-.player__deslize {
-  flex: 1 1 160px;
-  min-width: 0;
-  min-height: 44px;
-  margin: 0;
-  accent-color: var(--rosa);
 }
 
 .opcoes {

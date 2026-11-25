@@ -10,20 +10,22 @@ interface Props {
 
 export function Interruptor({ rotulo, ligado, textoLigado, textoDesligado, aoMudar }: Props) {
   const id = useId()
+  const idDoEstado = useId()
 
   return (
     <div className="interruptor">
-      <div>
+      <div aria-hidden="true">
         <p id={id} className="titulo-secao">
           {rotulo}
         </p>
-        <p className="texto-apoio">{ligado ? textoLigado : textoDesligado}</p>
+        <p id={idDoEstado} className="texto-apoio">{ligado ? textoLigado : textoDesligado}</p>
       </div>
       <button
         type="button"
         role="switch"
         aria-checked={ligado}
         aria-labelledby={id}
+        aria-describedby={idDoEstado}
         className="interruptor__botao"
         onClick={() => aoMudar(!ligado)}
       >

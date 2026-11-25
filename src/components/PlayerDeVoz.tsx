@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { usePreferencias } from '../contexto/usePreferencias'
-import { useLeitura, VELOCIDADE_MAXIMA, VELOCIDADE_MINIMA } from '../hooks/useLeitura'
+import { useLeitura } from '../hooks/useLeitura'
 import { Icone } from './Icone'
 
 const VELOCIDADES = [0.5, 1, 1.5, 2, 3, 5, 10]
@@ -63,7 +63,7 @@ export function PlayerDeVoz({ texto, idiomaDaFala }: { texto: string; idiomaDaFa
       <button
         type="button"
         className="botao-redondo player__mais-lento"
-        aria-label={t.player.maisLento}
+        aria-label={`${t.player.diminuir}, ${t.player.velocidadeAgora(leitura.velocidade)}`}
         title={t.player.maisLento}
         onClick={() => mudarVelocidade(-1)}
       >
@@ -80,23 +80,12 @@ export function PlayerDeVoz({ texto, idiomaDaFala }: { texto: string; idiomaDaFa
       <button
         type="button"
         className="botao-redondo player__mais-rapido"
-        aria-label={t.player.maisRapido}
+        aria-label={`${t.player.aumentar}, ${t.player.velocidadeAgora(leitura.velocidade)}`}
         title={t.player.maisRapido}
         onClick={() => mudarVelocidade(1)}
       >
         <Icone nome="maisRapido" tamanho={22} />
       </button>
-      <input
-        className="player__deslize"
-        type="range"
-        min={VELOCIDADE_MINIMA}
-        max={VELOCIDADE_MAXIMA}
-        step={0.5}
-        value={leitura.velocidade}
-        aria-label={t.player.velocidade}
-        aria-valuetext={t.player.velocidadeFalada(leitura.velocidade)}
-        onChange={(evento) => leitura.setVelocidade(Number(evento.target.value))}
-      />
       <span className="visualmente-oculto" role="status">
         {velocidadeAnunciada}
       </span>

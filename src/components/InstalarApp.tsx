@@ -8,7 +8,7 @@ export function InstalarApp({ destaque = false }: { destaque?: boolean }) {
   const [passosAbertos, setPassosAbertos] = useState(false)
   const idDosPassos = useId()
 
-  if (instalado) return null
+  if (instalado && !destaque) return null
 
   async function aoApertar() {
     if (podeInstalar && (await instalar())) return

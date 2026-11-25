@@ -19,10 +19,12 @@ export function Opcoes<T extends string>({ legenda, nome, valor, opcoes, aoMudar
               type="radio"
               name={nome}
               value={opcao.valor}
+              aria-label={opcao.rotulo}
+              lang={opcao.lang}
               checked={valor === opcao.valor}
               onChange={() => aoMudar(opcao.valor)}
             />
-            <span className="opcao__caixa" lang={opcao.lang}>
+            <span className="opcao__caixa" lang={opcao.lang} aria-hidden="true">
               <span className="opcao__marca">
                 <Icone nome="check" tamanho={16} />
               </span>
