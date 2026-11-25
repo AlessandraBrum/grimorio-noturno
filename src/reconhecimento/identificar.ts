@@ -2,11 +2,10 @@ import { lerLinha } from '../api/ocr'
 import { identificarCandidatos } from '../api/scryfall'
 import type { Idioma } from '../types/card'
 import { carregarCatalogo, chaveDoNome, procurarNoCatalogo, type Achado } from './catalogo'
-import { lerQuadro, orientacoes, recortarNome } from './barraDoNome'
-import { encontrarContornos } from './contorno'
+import { contarSimbolos, lerQuadro, orientacoes, recortarNome, type Quadro } from './barraDoNome'
+import { encontrarContornos, type Ponto } from './contorno'
+import { carregarFichas, desempatar, tiposLidos, type Sinais } from './desempate'
 import { encontrarFaixas, endireitar, type Faixa } from './faixas'
-import { prepararArte, reconhecerArte } from './arte'
-import type { Reconhecimento } from './reconhecer'
 
 const ALTURA_DO_TEXTO = 76
 const LARGURA_MAXIMA = 1400
@@ -21,7 +20,6 @@ const CONTORNOS_TESTADOS = 2
 const NOME_CURTO = 6
 const NOME_EXATO = 0.95
 const CONFIANCA_SOZINHA = 45
-const ESPERA_PELA_ARTE_MS = 400
 const MODOS_DE_RECORTE = ['tinta', 'cinza'] as const
 const PROPORCAO_MAXIMA_DO_NOME = 24
 const CONFIANCA_PARA_BUSCAR_ONLINE = 70
@@ -45,7 +43,7 @@ export interface Diagnostico {
 
 export interface CartaIdentificada {
   nome: string
-  porArte: boolean
+  porDesempate: boolean
 }
 
 interface Opcoes {
@@ -125,38 +123,35 @@ function tentativas(faixas: Faixa[]) {
   return lista
 }
 
-function esperar(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms))
+async function lerSinais(quadro: Quadro, cantos: Ponto[]): Promise<Sinais> {
+  const tipo = await lerLinha(recortarNome(quadro, cantos, 'cinza', 'tipo'))
+  const tipos = tiposLidos(tipo.texto)
+  const ehCriatura = tipos.includes('C')
+  const forca = ehCriatura || !tipos ? (await lerLinha(recortarNome(quadro, cantos, 'cinza', 'forca'))).texto : ''
+  return { tipos, simbolos: contarSimbolos(quadro, cantos), forca }
 }
 
-function arteConfiavel(arte: Reconhecimento | null, distancia: number, margem: number) {
-  return !!arte && arte.distancia <= distancia && arte.margem >= margem
-}
-
-function decidir(achados: Achado[], arte: Reconhecimento | null): CartaIdentificada | 'conflito' | null {
+async function decidir(achados: Achado[], leitura: Leitura): Promise<CartaIdentificada | null> {
   const [primeiro, segundo] = achados
   if (!primeiro || primeiro.pontuacao < NOME_POSSIVEL) return null
-  const arteForte = arteConfiavel(arte, 12, 8)
-  const possiveis = achados.filter((achado) => achado.pontuacao >= NOME_POSSIVEL)
-  const arteBate = !!arte && possiveis.some((achado) => achado.nome === arte.nome)
   const folga = primeiro.pontuacao === 1 ? FOLGA_COM_NOME_EXATO : FOLGA_ENTRE_NOMES
   const nomeClaro = primeiro.pontuacao >= NOME_CERTO
     && (!segundo || primeiro.pontuacao - segundo.pontuacao >= folga)
-  if (nomeClaro) {
-    if (arteForte && arte!.nome !== primeiro.nome) return 'conflito'
-    return { nome: primeiro.nome, porArte: false }
-  }
-  if (arteBate && arteConfiavel(arte, 22, 4)) return { nome: arte!.nome, porArte: true }
-  return null
+  if (nomeClaro) return { nome: primeiro.nome, porDesempate: false }
+  if (!leitura.pedirSinais || performance.now() - leitura.inicio > ORCAMENTO_MS) return null
+  const fichas = await carregarFichas().catch(() => null)
+  if (!fichas) return null
+  const sinais = await leitura.pedirSinais()
+  const possiveis = achados.filter((achado) => achado.pontuacao >= NOME_POSSIVEL).map((achado) => achado.nome)
+  const escolhido = desempatar(possiveis, sinais, fichas)
+  return escolhido ? { nome: escolhido, porDesempate: true } : null
 }
 
 interface Leitura {
-  arte: Reconhecimento | null
-  pedirArte: () => Promise<Reconhecimento | null>
+  pedirSinais: (() => Promise<Sinais>) | null
   melhor: { texto: string; confianca: number }
   provaveis: string[]
   anteriores: string[]
-  conflito: boolean
   inicio: number
   inclinacao: number
   catalogo: Awaited<ReturnType<typeof carregarCatalogo>>
@@ -172,22 +167,15 @@ async function avaliarTexto(texto: string, confianca: number, leitura: Leitura) 
   if (confianca < CONFIANCA_MINIMA || LINHA_DE_TIPO.test(semAcento) || SO_TIPO.test(semAcento) || LINHA_DE_DIREITOS.test(semAcento)) return null
   const achados = procurarNoCatalogo(leitura.catalogo, texto)
   const pontuacao = achados[0]?.pontuacao ?? 0
-  if (!leitura.arte && pontuacao >= NOME_POSSIVEL && pontuacao < NOME_CERTO) {
-    leitura.arte = await Promise.race([leitura.pedirArte(), esperar(ESPERA_PELA_ARTE_MS).then(() => null)])
-  }
   const [primeiro, segundo] = achados
   const provavel = primeiro && primeiro.pontuacao >= NOME_PROVAVEL
     && (!segundo || primeiro.pontuacao - segundo.pontuacao >= FOLGA_PROVAVEL)
   if (provavel && !leitura.provaveis.includes(primeiro.nome)) leitura.provaveis.push(primeiro.nome)
-  const decisao = decidir(achados, leitura.arte)
-  if (!decisao && provavel && leitura.anteriores.includes(primeiro.nome)) return { nome: primeiro.nome, porArte: false }
-  if (decisao && decisao !== 'conflito' && !decisao.porArte && precisaConfirmar(decisao.nome, pontuacao, confianca)) {
+  const decisao = await decidir(achados, leitura)
+  if (!decisao && provavel && leitura.anteriores.includes(primeiro.nome)) return { nome: primeiro.nome, porDesempate: false }
+  if (decisao && !decisao.porDesempate && precisaConfirmar(decisao.nome, pontuacao, confianca)) {
     if (!leitura.provaveis.includes(decisao.nome)) leitura.provaveis.push(decisao.nome)
     return leitura.anteriores.includes(decisao.nome) ? decisao : null
-  }
-  if (decisao === 'conflito') {
-    leitura.conflito = true
-    return null
   }
   return decisao
 }
@@ -208,6 +196,8 @@ async function lerBarraDoNome(origem: CanvasImageSource, largura: number, altura
   for (const contorno of contornos) {
     const emPe = orientacoes(contorno.cantos).sort((a, b) => a[0].y + a[1].y - b[0].y - b[1].y)
     for (const cantos of emPe) {
+      let sinais: Promise<Sinais> | null = null
+      leitura.pedirSinais = () => (sinais ??= lerSinais(quadro, cantos))
       for (const modo of MODOS_DE_RECORTE) {
         if (performance.now() - leitura.inicio > ORCAMENTO_MS) return { decisao: null, ocupacao: contornos[0].ocupacao }
         const { texto, confianca } = await lerLinha(recortarNome(quadro, cantos, modo))
@@ -216,6 +206,7 @@ async function lerBarraDoNome(origem: CanvasImageSource, largura: number, altura
       }
     }
   }
+  leitura.pedirSinais = null
   return { decisao: null, ocupacao: contornos[0].ocupacao }
 }
 
@@ -235,7 +226,7 @@ async function lerNomes(origem: CanvasImageSource, largura: number, altura: numb
 const buscadosOnline = new Set<string>()
 
 export function prepararIdentificacao() {
-  return Promise.allSettled([carregarCatalogo(), prepararArte()])
+  return Promise.allSettled([carregarCatalogo(), carregarFichas()])
 }
 
 export async function identificarCarta(
@@ -246,17 +237,11 @@ export async function identificarCarta(
   { diagnostico, rapido = false, anteriores = [] }: Opcoes = {},
 ): Promise<CartaIdentificada | null> {
   const catalogo = await carregarCatalogo()
-  let promessaDaArte: Promise<Reconhecimento | null> | null = null
   const leitura: Leitura = {
-    arte: null,
-    pedirArte: () => {
-      promessaDaArte ??= reconhecerArte(origem, largura, altura).catch(() => null)
-      return promessaDaArte
-    },
+    pedirSinais: null,
     melhor: { texto: '', confianca: 0 },
     provaveis: [],
     anteriores,
-    conflito: false,
     inicio: performance.now(),
     inclinacao: 0,
     catalogo,
@@ -273,16 +258,14 @@ export async function identificarCarta(
     diagnostico.dica = ocupacao > 0 && ocupacao < CARTA_PEQUENA ? 'aproxime'
       : Math.abs(leitura.inclinacao) >= CARTA_TORTA_GRAUS ? 'endireite' : null
   }
-  const { melhor: melhorLeitura, conflito } = leitura
+  const { melhor: melhorLeitura } = leitura
 
   const chaveOnline = chaveDoNome(melhorLeitura.texto)
-  if (!conflito && melhorLeitura.confianca >= CONFIANCA_PARA_BUSCAR_ONLINE && chaveOnline.length >= 4 && !buscadosOnline.has(chaveOnline)) {
+  if (melhorLeitura.confianca >= CONFIANCA_PARA_BUSCAR_ONLINE && chaveOnline.length >= 4 && !buscadosOnline.has(chaveOnline)) {
     buscadosOnline.add(chaveOnline)
     try {
       const { nomes, certeza } = await identificarCandidatos([melhorLeitura.texto], idioma, 'camera')
-      leitura.arte ??= await leitura.pedirArte()
-      const arteContra = arteConfiavel(leitura.arte, 12, 8) && leitura.arte!.nome !== nomes[0]
-      if (certeza && nomes[0] && !arteContra) return { nome: nomes[0], porArte: false }
+      if (certeza && nomes[0]) return { nome: nomes[0], porDesempate: false }
     } catch {
       return null
     }

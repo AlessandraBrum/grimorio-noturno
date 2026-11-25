@@ -51,8 +51,7 @@ O app não pede cadastro e não usa anúncios nem rastreio. Suas preferências e
 | Playwright e axe-core | Testes que abrem o app num navegador de verdade e conferem as regras de acessibilidade, até o nível AAA |
 | MediaDevices e Canvas | Abrem a câmera e preparam os quadros para a leitura no próprio aparelho |
 | Tesseract.js e WebAssembly | Leem o nome escrito na carta, no aparelho, em português ou inglês |
-| Web Worker | Tira a comparação das artes da tela principal, para o app não travar enquanto procura |
-| Impressão digital da arte | Compara o desenho da carta com uma base de mais de 34 mil artes para confirmar o nome |
+| Base de tipos e custos | Arquivo gerado a partir dos dados gratuitos do Scryfall com o tipo, o custo de mana e o poder/resistência de cada carta, usado para desempatar nomes parecidos |
 | API do Scryfall | Consulta nomes, textos, imagens e o catálogo de nomes das cartas |
 | Resend | Entrega por e-mail as mensagens do formulário de contato |
 | Vercel | Hospeda o site e a função que envia o formulário |
@@ -77,7 +76,7 @@ Depois, procura o retângulo da carta na imagem, endireita a foto e tenta ler o 
 
 A leitura do nome usa o Tesseract.js, que roda dentro do aparelho. Ele é preparado só com os modelos de português e inglês, lê uma linha de cada vez e ignora os caracteres que não aparecem em nomes de cartas. Os modelos e o motor ficam dentro do próprio app, então não é preciso baixar nada de fora na primeira leitura.
 
-O texto lido é comparado com o catálogo de nomes de cartas, tolerando letras trocadas, nomes cortados e pedaços do nome. Além do texto, o app compara a arte da carta com uma base de mais de 34 mil impressões digitais geradas a partir das imagens do Scryfall. Essa comparação roda em segundo plano e serve para confirmar o nome ou desempatar quando a leitura ficou na dúvida.
+O texto lido é comparado com o catálogo de nomes de cartas, tolerando letras trocadas, nomes cortados e pedaços do nome. Quando a leitura fica na dúvida entre nomes parecidos, o app desempata nesta ordem: lê a linha de tipo (criatura, feitiço, mágica instantânea, terreno...), conta os símbolos do custo de mana no canto do nome e, em criaturas, lê o poder e a resistência. Depois compara com a base de tipos e custos. A arte não entra na decisão, porque muda entre edições, cartas foil e artes personalizadas.
 
 Quando a leitura não fecha, o app dá uma dica: aproximar a carta ou endireitar, com vibração e um aviso sonoro curto. Se continuar em dúvida, mostra até três candidatos e pede confirmação antes de abrir a ficha.
 
@@ -88,7 +87,7 @@ O reconhecimento acontece no aparelho, e o app envia ao Scryfall apenas os nomes
 - Ler imagem no navegador: pegar o quadro da câmera, achar o contorno da carta, corrigir a inclinação e deixar a imagem pronta para o leitor de texto.
 - OCR na prática: escolher os parâmetros do Tesseract, limitar os caracteres aceitos e conviver com o que ele erra.
 - Comparar texto com tolerância a erros: catálogo indexado por trigramas, distância de edição e limites de confiança em vez de igualdade exata.
-- Comparar imagens: transformar a arte da carta numa impressão digital pequena e procurá-la numa base de dezenas de milhares de artes sem travar a tela.
+- Desempatar com regras do jogo: usar a linha de tipo, o custo de mana e o poder/resistência, que toda carta traz impressos, em vez da arte.
 - Orçamento de tempo: decidir quanto o app pode gastar por quadro e cortar caminho quando a resposta já está boa.
 - Acessibilidade na prática: contraste AAA, navegação por teclado, leitor de tela, movimento reduzido, linguagem simples e testes automáticos com o axe.
 - Testes que abrem o navegador de verdade: Playwright simulando câmera, microfone, rede e um Scryfall de mentira.

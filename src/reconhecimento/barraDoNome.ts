@@ -2,13 +2,25 @@ import type { Ponto } from './contorno'
 
 const LARGURA_DA_CARTA = 700
 const ALTURA_DA_CARTA = Math.round((LARGURA_DA_CARTA * 88) / 63)
-const FAIXA_DE_BUSCA = { x0: 0.03, x1: 0.97, y0: 0.015, y1: 0.17 }
-const COLUNAS_DO_TEXTO = { x0: 0.06, x1: 0.7 }
+const NOME: Regiao = { busca: { x0: 0.03, x1: 0.97, y0: 0.015, y1: 0.17 }, colunas: { x0: 0.06, x1: 0.7 } }
+const TIPO: Regiao = { busca: { x0: 0.03, x1: 0.97, y0: 0.535, y1: 0.615 }, colunas: { x0: 0.07, x1: 0.62 } }
+const FORCA: Regiao = { busca: { x0: 0.74, x1: 0.97, y0: 0.86, y1: 0.97 }, colunas: { x0: 0.78, x1: 0.93 } }
+const SIMBOLOS = { x0: 0.45, x1: 0.955 }
+const VAO_ENTRE_SIMBOLOS = 0.45
+const SIMBOLO_MINIMO = 0.45
+const PASSO_DO_SIMBOLO = 1.1
 const ALTURA_DA_LINHA = 0.042
 const FOLGA_DA_LINHA = 0.3
 const ALTURA_DO_TEXTO = 48
 const TRACO_DEITADO = 3
 const TRACO_EM_PE = 1.3
+
+interface Faixa { x0: number; x1: number; y0: number; y1: number }
+interface Regiao { busca: Faixa; colunas: { x0: number; x1: number } }
+
+export type ParteDaCarta = 'nome' | 'tipo' | 'forca'
+
+const REGIOES: Record<ParteDaCarta, Regiao> = { nome: NOME, tipo: TIPO, forca: FORCA }
 
 export interface Quadro {
   dados: Uint8ClampedArray
@@ -117,9 +129,9 @@ function amostrar(quadro: Quadro, cantos: Ponto[], regiao: { x0: number; x1: num
   return { cinza, w, h }
 }
 
-function linhaMaisProvavel(cinza: Float32Array, w: number, h: number) {
-  const x0 = Math.round(((COLUNAS_DO_TEXTO.x0 - FAIXA_DE_BUSCA.x0) / (FAIXA_DE_BUSCA.x1 - FAIXA_DE_BUSCA.x0)) * w)
-  const x1 = Math.round(((COLUNAS_DO_TEXTO.x1 - FAIXA_DE_BUSCA.x0) / (FAIXA_DE_BUSCA.x1 - FAIXA_DE_BUSCA.x0)) * w)
+function linhaMaisProvavel(cinza: Float32Array, w: number, h: number, { busca, colunas }: Regiao) {
+  const x0 = Math.round(((colunas.x0 - busca.x0) / (busca.x1 - busca.x0)) * w)
+  const x1 = Math.round(((colunas.x1 - busca.x0) / (busca.x1 - busca.x0)) * w)
   const energia = new Float32Array(h)
   for (let y = 0; y < h; y++) {
     let soma = 0
@@ -282,9 +294,51 @@ function ampliar(claro: Uint8ClampedArray, w: number, h: number, escala: number)
   return saida
 }
 
-export function recortarNome(quadro: Quadro, cantos: Ponto[], modo: 'tinta' | 'cinza' = 'tinta') {
-  const { cinza, w, h } = amostrar(quadro, cantos, FAIXA_DE_BUSCA)
-  const { topo, altura } = linhaMaisProvavel(cinza, w, h)
+export function contarSimbolos(quadro: Quadro, cantos: Ponto[]) {
+  const { cinza, w, h } = amostrar(quadro, cantos, NOME.busca)
+  const { topo, altura } = linhaMaisProvavel(cinza, w, h, NOME)
+  const largura = NOME.busca.x1 - NOME.busca.x0
+  const x0 = Math.round(((SIMBOLOS.x0 - NOME.busca.x0) / largura) * w)
+  const x1 = Math.round(((SIMBOLOS.x1 - NOME.busca.x0) / largura) * w)
+  const y0 = Math.max(1, topo - Math.round(altura * 0.15))
+  const y1 = Math.min(h - 1, topo + Math.round(altura * 1.15))
+  const energia = new Float32Array(x1 - x0)
+  for (let x = x0; x < x1; x++) {
+    let soma = 0
+    for (let y = y0; y < y1; y++) {
+      const i = y * w + x
+      soma += Math.abs(cinza[i] - cinza[i - 1]) + Math.abs(cinza[i] - cinza[i - w])
+    }
+    energia[x - x0] = soma / (y1 - y0)
+  }
+  const ordenada = [...energia].sort((a, b) => a - b)
+  const fundo = ordenada[Math.floor(ordenada.length * 0.3)]
+  const pico = ordenada[Math.floor(ordenada.length * 0.95)]
+  if (pico - fundo < 6) return 0
+  const limiar = fundo + (pico - fundo) * 0.35
+  const vao = altura * VAO_ENTRE_SIMBOLOS
+  let fim = -1
+  let inicio = -1
+  let ultimo = -1
+  for (let x = energia.length - 1; x >= 0; x--) {
+    if (energia[x] < limiar) {
+      if (fim >= 0 && ultimo - x > vao) break
+      continue
+    }
+    if (fim < 0) fim = x
+    inicio = x
+    ultimo = x
+  }
+  if (fim < 0) return 0
+  const extensao = fim - inicio + 1
+  if (extensao < altura * SIMBOLO_MINIMO) return 0
+  return Math.max(1, Math.round(extensao / (altura * PASSO_DO_SIMBOLO)))
+}
+
+export function recortarNome(quadro: Quadro, cantos: Ponto[], modo: 'tinta' | 'cinza' = 'tinta', parte: ParteDaCarta = 'nome') {
+  const regiao = REGIOES[parte]
+  const { cinza, w, h } = amostrar(quadro, cantos, regiao.busca)
+  const { topo, altura } = linhaMaisProvavel(cinza, w, h, regiao)
   const folga = Math.round(altura * FOLGA_DA_LINHA)
   const y0 = Math.max(0, topo - folga)
   const y1 = Math.min(h, topo + altura + folga)

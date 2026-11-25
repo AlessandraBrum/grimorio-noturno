@@ -74,7 +74,7 @@ async function baixarDoScryfall() {
 }
 
 async function baixarDaBaseLocal() {
-  const resposta = await fetch(`${import.meta.env.BASE_URL}cartas/impressoes.json`)
+  const resposta = await fetch(`${import.meta.env.BASE_URL}cartas/cartas.json`)
   if (!resposta.ok) throw new Error('base indisponível')
   return ((await resposta.json()) as { nomes: string[] }).nomes
 }
