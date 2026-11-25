@@ -31,6 +31,8 @@ Em breve: buscar a carta falando o nome e apontando a câmera.
 
 O app não pede cadastro e não usa anúncios nem rastreio. Suas preferências e as últimas cartas abertas ficam guardadas só no seu aparelho.
 
+
+
 ## Como foi feito
 
 ### Tecnologias
@@ -42,91 +44,69 @@ O app não pede cadastro e não usa anúncios nem rastreio. Suas preferências e
 | React | Monta as telas a partir de peças reutilizáveis, como o botão e a barra de abas |
 | Vite | Roda o app no computador durante o desenvolvimento e gera a versão final |
 | CSS com variáveis | Cores, espaçamentos e temas (noturno e claro) num lugar só, sem framework de CSS |
-| Web Speech API | A leitura em voz alta, com a voz que já vem no aparelho |
+| Web Speech API | A leitura em voz alta e a busca falando o nome da carta, com os recursos que já vêm no aparelho |
 | PWA (manifesto) | Permite abrir por link ou QR code e, se a pessoa quiser, instalar na tela inicial |
 | Fontsource | As fontes Atkinson Hyperlegible Next e Cormorant Garamond ficam dentro do app, sem depender do Google Fonts |
 | Oxlint | Revisa o código e aponta erros comuns |
-| MediaDevices e Canvas | Capturam o vídeo e preparam os quadros no navegador |
-| Tesseract.js e WebAssembly | Reconhecem o nome da carta no aparelho, em português ou inglês |
-| API do Scryfall | Consulta os nomes, textos e dados das cartas |
-| Google Cloud Vision | OCR opcional do recorte do título, habilitado com a variável de ambiente de servidor `GOOGLE_CLOUD_VISION_API_KEY` |
-| Vercel | Hospeda o site publicado |
+| Playwright e axe-core | Testes que abrem o app num navegador de verdade e conferem as regras de acessibilidade, até o nível AAA |
+| MediaDevices e Canvas | Abrem a câmera e preparam os quadros para a leitura no próprio aparelho |
+| Tesseract.js e WebAssembly | Leem o nome escrito na carta, no aparelho, em português ou inglês |
+| Web Worker | Tira a comparação das artes da tela principal, para o app não travar enquanto procura |
+| Impressão digital da arte | Compara o desenho da carta com uma base de mais de 34 mil artes para confirmar o nome |
+| API do Scryfall | Consulta nomes, textos, imagens e o catálogo de nomes das cartas |
+| Basin | Recebe as mensagens do formulário de contato |
+| Vercel | Hospeda o site e a função que envia o formulário |
 
 ### Como o app conversa com o Scryfall
 
 O Scryfall é um site público com os dados de todas as cartas de Magic. O app pede as informações direto à API dele, sem chave de acesso e sem servidor próprio no meio:
 
-- Enquanto a pessoa digita, o app pede sugestões de nomes (`/cards/autocomplete`).
-- Quando ela escolhe, busca a carta pelo nome, aceitando pequenos erros de digitação (`/cards/named?fuzzy=`).
-- Depois, procura se existe uma versão da carta em português (`/cards/search` com `lang:pt`). Se não existir, mostra em inglês e avisa.
+- Enquanto a pessoa digita, o app pede sugestões de nomes (`/cards/autocomplete`) e mostra até oito.
+- Quando ela escolhe, procura primeiro a versão da carta em português (`/cards/search` com o nome entre aspas e `lang:pt`). Se a carta não tiver texto em português, busca a mesma carta em inglês e avisa na ficha.
+- Quando o nome vem da câmera ou da voz, aceita pequenos erros de digitação (`/cards/named?fuzzy=`) e, se preciso, procura pelas palavras lidas (`/cards/search` com `lang:` e os termos). Depois compara o que foi lido com os nomes encontrados e só aceita quando a semelhança é alta. Se dois nomes ficarem parecidos, pede confirmação antes de abrir.
+- O catálogo com todos os nomes de cartas (`/catalog/card-names`) é baixado uma vez, fica guardado por 14 dias no aparelho e é usado para comparar o que o leitor da câmera entendeu. Se o download falhar, o app usa a lista que vem dentro dele. Os nomes em português vêm de um arquivo próprio.
+- As cartas já abertas e as buscas recentes ficam guardadas no aparelho, então voltar a uma carta vista antes não gasta internet.
 
-Para respeitar as regras do Scryfall, o app espera pelo menos 100 ms entre um pedido e outro, guarda as cartas já abertas no aparelho e mostra as imagens originais, sem cortar nem mudar cores, com o nome do artista.
+Para respeitar as regras do Scryfall, o app espera pelo menos 100 ms entre um pedido e outro, desiste de um pedido que passe de 3,5 s, tenta de novo uma vez e avisa quando está sem internet. As imagens aparecem na versão original, sem cortar nem mudar cores, com o nome do artista.
 
-### Câmera com Tesseract (versão 3)
+### Câmera: como o app reconhece a carta
 
-Ao abrir a câmera, o Grimório prepara apenas o modelo do idioma selecionado (português ou inglês). A leitura com Tesseract.js usa o quadro inteiro, com uma imagem menor na maioria das tentativas. Periodicamente, tenta de novo com mais resolução e correção de inclinação. O reconhecimento acontece no aparelho, e o aplicativo envia ao Scryfall apenas os nomes candidatos.
+Ao abrir a câmera, o app espera a imagem parar por 250 ms e confere se há contraste suficiente. Assim ele não lê um quadro tremido.
 
-Na busca escrita, digite o nome exato ou escolha uma das sugestões. Na câmera e ao escolher uma foto, o app compara o nome e o tipo com os dados da carta. Quando encontra um candidato, pede confirmação antes de abrir a ficha. Se o Scryfall não tiver o texto completo em português, a ficha avisa e usa o conteúdo em inglês.
+Depois, procura o retângulo da carta na imagem, endireita a foto e tenta ler o nome na faixa do topo. Se o nome não aparecer ali, tenta as outras faixas de texto e também a carta de lado ou de cabeça para baixo. Cada tentativa tem um limite de tempo, para o app continuar respondendo enquanto procura.
 
-Antes disso, a versão 2 vai permitir falar o nome da carta, usando o reconhecimento de voz do navegador.
+A leitura do nome usa o Tesseract.js, que roda dentro do aparelho. Ele é preparado só com os modelos de português e inglês, lê uma linha de cada vez e ignora os caracteres que não aparecem em nomes de cartas. Os modelos e o motor ficam dentro do próprio app, então não é preciso baixar nada de fora na primeira leitura.
+
+O texto lido é comparado com o catálogo de nomes de cartas, tolerando letras trocadas, nomes cortados e pedaços do nome. Além do texto, o app compara a arte da carta com uma base de mais de 34 mil impressões digitais geradas a partir das imagens do Scryfall. Essa comparação roda em segundo plano e serve para confirmar o nome ou desempatar quando a leitura ficou na dúvida.
+
+Quando a leitura não fecha, o app dá uma dica: aproximar a carta ou endireitar, com vibração e um aviso sonoro curto. Se continuar em dúvida, mostra até três candidatos e pede confirmação antes de abrir a ficha.
+
+O reconhecimento acontece no aparelho, e o app envia ao Scryfall apenas os nomes candidatos. O recorte da imagem não sai do aparelho.
 
 ## O que estou aprendendo
 
-- React com TypeScript: dividir as telas em componentes e dar tipos aos dados das cartas.
-- Consumir uma API pública com cuidado: limite de pedidos, erros, falta de internet e guardar dados no aparelho.
-- Acessibilidade na prática: contraste AAA, navegação por teclado, leitor de tela, movimento reduzido e linguagem simples.
+- Ler imagem no navegador: pegar o quadro da câmera, achar o contorno da carta, corrigir a inclinação e deixar a imagem pronta para o leitor de texto.
+- OCR na prática: escolher os parâmetros do Tesseract, limitar os caracteres aceitos e conviver com o que ele erra.
+- Comparar texto com tolerância a erros: catálogo indexado por trigramas, distância de edição e limites de confiança em vez de igualdade exata.
+- Comparar imagens: transformar a arte da carta numa impressão digital pequena e procurá-la numa base de dezenas de milhares de artes sem travar a tela.
+- Orçamento de tempo: decidir quanto o app pode gastar por quadro e cortar caminho quando a resposta já está boa.
+- Acessibilidade na prática: contraste AAA, navegação por teclado, leitor de tela, movimento reduzido, linguagem simples e testes automáticos com o axe.
+- Testes que abrem o navegador de verdade: Playwright simulando câmera, microfone, rede e um Scryfall de mentira.
+- Consumir uma API pública com cuidado: limite de pedidos, espera entre chamadas, erros, falta de internet e cache no aparelho.
+- React com TypeScript: dividir as telas em componentes, dar tipos aos dados das cartas e manter o estado previsível.
 - Design system: transformar um protótipo em tokens de cor, tipografia e componentes.
-- Recursos do navegador: leitura em voz alta e, nas próximas versões, reconhecimento de voz e OCR com câmera.
-- PWA: fazer um site funcionar como app no celular.
-
-## Rodar no computador
-
-Com o Node.js instalado, abra o terminal na pasta do projeto e rode:
-
-```bash
-npm install
-npm run dev
-```
-
-O primeiro comando baixa o que o projeto precisa, e só é necessário na primeira vez. O segundo abre o app no navegador.
-
-## Aviso
-
-Este é um projeto independente sem qualquer vínculo, endosso ou afiliação com a Wizards of the Coast LLC ou Hasbro. Magic: The Gathering, seus respectivos logotipos, símbolos de mana e designs de cartas são propriedades registradas da Wizards of the Coast LLC. API do Scryfall.
+- PWA: fazer um site funcionar como app no celular, com manifesto, ícones e tema.
 
 
 ## Formulário de contato
 
-Abra **Ajustes → Contato** ou use o link em Ajuda, Sobre ou no rodapé. Escolha o assunto, escreva a
+Abra **Contato** ou use o link em Ajuda, Sobre ou no rodapé. Escolha o assunto, escreva a
 mensagem e informe por onde quer receber a resposta. Você pode anexar várias
 imagens, revisar a lista e remover anexos antes de enviar. Os atalhos
 **Reportar erro** na câmera e na ficha selecionam o assunto automaticamente e
 incluem uma captura quando houver. A captura só é transmitida ao enviar.
 
-### Ativar o envio na Vercel
 
-1. [Crie um formulário no Basin](https://docs.usebasin.com/getting-started/quickstart/).
-2. Em **Emails**, configure `ambuxedev@gmail.com` para receber as
-   notificações e confirme o endereço pelo e-mail do Basin.
-3. Na Vercel, em **Settings → Environment Variables**, adicione
-   `CONTATO_BASIN_URL` com a URL da aba **Setup** do formulário
-   (no formato `https://usebasin.com/f/ID`). Selecione Production ou Preview
-   conforme o ambiente onde vai testar.
-4. Faça um novo deploy para a Vercel carregar as variáveis. O Vite sozinho
-   renderiza a página local, e a função `/api/contato` roda na Vercel.
-5. Abra o formulário no deploy e envie uma mensagem com duas imagens.
-   Confira a chegada em `ambuxedev@gmail.com` e teste o botão **Responder**.
-   Teste também a opção WhatsApp, que inclui o número internacional no corpo
-   para você abrir uma conversa e responder manualmente.
+## Aviso
 
-As partes chegam com o mesmo protocolo e sua posição na sequência. O formulário
-aceita texto sem contagem máxima e permite adicionar imagens em múltiplas
-seleções. Imagens maiores são reduzidas no dispositivo para caber em 3 MB por
-anexo. Se o navegador não conseguir abrir o formato, exporte a foto como JPEG
-ou PNG e tente novamente. Se uma
-parte falhar, o botão **Continuar envio** retoma das partes ainda sem confirmação
-enquanto a página estiver aberta. Cada parte conta como um envio no Basin, que inclui links das imagens nas notificações.
-
-A rota aceita apenas envios da origem do site e encaminha para o formulário
-configurado no Basin. Contra spam, há um campo oculto e um limite de 60 partes a cada 10
-minutos por IP em cada instância da função.
+Este é um projeto independente sem qualquer vínculo, endosso ou afiliação com a Wizards of the Coast LLC ou Hasbro. Magic: The Gathering, seus respectivos logotipos, símbolos de mana e designs de cartas são propriedades registradas da Wizards of the Coast LLC. API do Scryfall.
