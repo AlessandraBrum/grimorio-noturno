@@ -2,9 +2,9 @@ import { lerLinha } from '../api/ocr'
 import { identificarCandidatos } from '../api/scryfall'
 import type { Idioma } from '../types/card'
 import { carregarCatalogo, chaveDoNome, procurarNoCatalogo, type Achado } from './catalogo'
-import { contarSimbolos, lerQuadro, orientacoes, recortarNome, type Quadro } from './barraDoNome'
+import { lerCusto, lerQuadro, orientacoes, recortarNome, type Custo, type Quadro } from './barraDoNome'
 import { encontrarContornos, type Ponto } from './contorno'
-import { carregarFichas, desempatar, tiposLidos, type Sinais } from './desempate'
+import { carregarFichas, custoConfere, desempatar, tiposLidos, type Fichas, type Sinais } from './desempate'
 import { encontrarFaixas, endireitar, type Faixa } from './faixas'
 
 const ALTURA_DO_TEXTO = 76
@@ -128,27 +128,32 @@ async function lerSinais(quadro: Quadro, cantos: Ponto[]): Promise<Sinais> {
   const tipos = tiposLidos(tipo.texto)
   const ehCriatura = tipos.includes('C')
   const forca = ehCriatura || !tipos ? (await lerLinha(recortarNome(quadro, cantos, 'cinza', 'forca'))).texto : ''
-  return { tipos, simbolos: contarSimbolos(quadro, cantos), forca }
+  return { tipos, forca }
 }
 
-async function decidir(achados: Achado[], leitura: Leitura): Promise<CartaIdentificada | null> {
+function confere(leitura: Leitura, nome: string, pontuacao: number) {
+  return custoConfere(nome, pontuacao, leitura.custo, leitura.fichas)
+}
+
+async function decidir(todos: Achado[], leitura: Leitura): Promise<CartaIdentificada | null> {
+  const achados = todos.filter((achado) => achado.pontuacao >= NOME_POSSIVEL && confere(leitura, achado.nome, achado.pontuacao))
   const [primeiro, segundo] = achados
-  if (!primeiro || primeiro.pontuacao < NOME_POSSIVEL) return null
+  if (!primeiro) return null
   const folga = primeiro.pontuacao === 1 ? FOLGA_COM_NOME_EXATO : FOLGA_ENTRE_NOMES
   const nomeClaro = primeiro.pontuacao >= NOME_CERTO
     && (!segundo || primeiro.pontuacao - segundo.pontuacao >= folga)
   if (nomeClaro) return { nome: primeiro.nome, porDesempate: false }
-  if (!leitura.pedirSinais || performance.now() - leitura.inicio > ORCAMENTO_MS) return null
-  const fichas = await carregarFichas().catch(() => null)
-  if (!fichas) return null
+  if (!leitura.pedirSinais || !leitura.fichas || achados.length < 2 || performance.now() - leitura.inicio > ORCAMENTO_MS) return null
   const sinais = await leitura.pedirSinais()
-  const possiveis = achados.filter((achado) => achado.pontuacao >= NOME_POSSIVEL).map((achado) => achado.nome)
-  const escolhido = desempatar(possiveis, sinais, fichas)
+  const escolhido = desempatar(achados.map((achado) => achado.nome), sinais, leitura.fichas)
   return escolhido ? { nome: escolhido, porDesempate: true } : null
 }
 
 interface Leitura {
   pedirSinais: (() => Promise<Sinais>) | null
+  custo: Custo | null
+  custoDaCarta: Custo | null
+  fichas: Fichas | null
   melhor: { texto: string; confianca: number }
   provaveis: string[]
   anteriores: string[]
@@ -172,7 +177,7 @@ async function avaliarTexto(texto: string, confianca: number, leitura: Leitura) 
     && (!segundo || primeiro.pontuacao - segundo.pontuacao >= FOLGA_PROVAVEL)
   if (provavel && !leitura.provaveis.includes(primeiro.nome)) leitura.provaveis.push(primeiro.nome)
   const decisao = await decidir(achados, leitura)
-  if (!decisao && provavel && leitura.anteriores.includes(primeiro.nome)) return { nome: primeiro.nome, porDesempate: false }
+  if (!decisao && provavel && leitura.anteriores.includes(primeiro.nome) && confere(leitura, primeiro.nome, primeiro.pontuacao)) return { nome: primeiro.nome, porDesempate: false }
   if (decisao && !decisao.porDesempate && precisaConfirmar(decisao.nome, pontuacao, confianca)) {
     if (!leitura.provaveis.includes(decisao.nome)) leitura.provaveis.push(decisao.nome)
     return leitura.anteriores.includes(decisao.nome) ? decisao : null
@@ -198,6 +203,8 @@ async function lerBarraDoNome(origem: CanvasImageSource, largura: number, altura
     for (const cantos of emPe) {
       let sinais: Promise<Sinais> | null = null
       leitura.pedirSinais = () => (sinais ??= lerSinais(quadro, cantos))
+      leitura.custo = lerCusto(quadro, cantos)
+      leitura.custoDaCarta ??= leitura.custo
       for (const modo of MODOS_DE_RECORTE) {
         if (performance.now() - leitura.inicio > ORCAMENTO_MS) return { decisao: null, ocupacao: contornos[0].ocupacao }
         const { texto, confianca } = await lerLinha(recortarNome(quadro, cantos, modo))
@@ -207,6 +214,7 @@ async function lerBarraDoNome(origem: CanvasImageSource, largura: number, altura
     }
   }
   leitura.pedirSinais = null
+  leitura.custo = null
   return { decisao: null, ocupacao: contornos[0].ocupacao }
 }
 
@@ -239,6 +247,9 @@ export async function identificarCarta(
   const catalogo = await carregarCatalogo()
   const leitura: Leitura = {
     pedirSinais: null,
+    custo: null,
+    custoDaCarta: null,
+    fichas: await carregarFichas().catch(() => null),
     melhor: { texto: '', confianca: 0 },
     provaveis: [],
     anteriores,
@@ -265,7 +276,7 @@ export async function identificarCarta(
     buscadosOnline.add(chaveOnline)
     try {
       const { nomes, certeza } = await identificarCandidatos([melhorLeitura.texto], idioma, 'camera')
-      if (certeza && nomes[0]) return { nome: nomes[0], porDesempate: false }
+      if (certeza && nomes[0] && custoConfere(nomes[0], 0, leitura.custoDaCarta, leitura.fichas)) return { nome: nomes[0], porDesempate: false }
     } catch {
       return null
     }

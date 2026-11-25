@@ -6,20 +6,28 @@ import { FimDeSecao } from '../components/SetaTopo'
 import { usePreferencias } from '../contexto/usePreferencias'
 import type { Card } from '../types/card'
 import { Icone } from '../components/Icone'
+import { InstalarApp } from '../components/InstalarApp'
 import { gravar, ler } from '../contexto/armazenamento'
 
 const INTERVALO_AVISO_FONE = 15
 
-let mostrarAvisoFone: boolean | null = null
+let acessoAtual: number | null = null
+
+function contarAcesso() {
+  if (acessoAtual === null) {
+    const { total } = ler('acessos', { total: 0 })
+    acessoAtual = (Number.isFinite(total) && total > 0 ? total : 0) + 1
+    gravar('acessos', { total: acessoAtual })
+  }
+  return acessoAtual
+}
 
 function deveMostrarAvisoFone() {
-  if (mostrarAvisoFone === null) {
-    const { total } = ler('acessos', { total: 0 })
-    const atual = (Number.isFinite(total) && total > 0 ? total : 0) + 1
-    gravar('acessos', { total: atual })
-    mostrarAvisoFone = (atual - 1) % INTERVALO_AVISO_FONE === 0
-  }
-  return mostrarAvisoFone
+  return (contarAcesso() - 1) % INTERVALO_AVISO_FONE === 0
+}
+
+function ehPrimeiroAcesso() {
+  return contarAcesso() === 1
 }
 
 export type EstadoBusca = 'parado' | 'carregando' | 'nao-encontrada' | 'sem-internet' | 'servico-indisponivel'
@@ -33,6 +41,7 @@ interface Props {
 export function Buscar({ estado, aoBuscar, aoAbrirRecente }: Props) {
   const { t } = usePreferencias()
   const [avisoFone] = useState(deveMostrarAvisoFone)
+  const [primeiroAcesso] = useState(ehPrimeiroAcesso)
 
   return (
     <div className="tela tela--centro">
@@ -59,6 +68,8 @@ export function Buscar({ estado, aoBuscar, aoAbrirRecente }: Props) {
         {estado === 'sem-internet' && <p className="aviso erro">{t.buscar.semInternet}</p>}
         {estado === 'servico-indisponivel' && <p className="aviso erro">{t.buscar.servicoIndisponivel}</p>}
       </div>
+
+      {primeiroAcesso && <InstalarApp />}
 
       <CarrosselRecentes aoAbrir={aoAbrirRecente} />
       <FimDeSecao />

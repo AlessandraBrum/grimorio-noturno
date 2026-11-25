@@ -38,8 +38,14 @@ export function PlayerDeVoz({ texto, idiomaDaFala }: { texto: string; idiomaDaFa
     else lerAgora()
   }
 
-  function aumentarVelocidade() {
-    const proxima = VELOCIDADES.find((opcao) => opcao > leitura.velocidade) ?? VELOCIDADES[0]
+  function mudarVelocidade(sentido: 1 | -1) {
+    const proxima = sentido > 0
+      ? VELOCIDADES.find((opcao) => opcao > leitura.velocidade)
+      : [...VELOCIDADES].reverse().find((opcao) => opcao < leitura.velocidade)
+    if (proxima === undefined) {
+      setVelocidadeAnunciada(sentido > 0 ? t.player.velocidadeNoMaximo : t.player.velocidadeNoMinimo)
+      return
+    }
     leitura.setVelocidade(proxima)
     setVelocidadeAnunciada(t.player.velocidadeFalada(proxima))
   }
@@ -54,19 +60,31 @@ export function PlayerDeVoz({ texto, idiomaDaFala }: { texto: string; idiomaDaFa
 
   return (
     <section className="player" aria-label={t.player.regiao}>
-      <button type="button" className="player__principal" aria-label={rotuloPrincipal} onClick={aoApertar}>
-        <Icone nome={lendo ? 'pausar' : 'tocar'} tamanho={24} />
-      </button>
-      <p className="player__estado" role="status">
-        {estadoFalado}
-      </p>
       <button
         type="button"
-        className="player__velocidade"
-        aria-label={t.player.velocidadeBotao(leitura.velocidade)}
-        onClick={aumentarVelocidade}
+        className="botao-redondo player__mais-lento"
+        aria-label={t.player.maisLento}
+        title={t.player.maisLento}
+        onClick={() => mudarVelocidade(-1)}
       >
-        {t.player.velocidade} <strong>{t.player.velocidadeCurta(leitura.velocidade)}</strong>
+        <Icone nome="maisLento" tamanho={22} />
+      </button>
+      <div className="player__painel">
+        <p className="player__estado" role="status">
+          {estadoFalado}
+        </p>
+        <p className="player__velocidade">
+          {t.player.velocidade} <strong>{t.player.velocidadeCurta(leitura.velocidade)}</strong>
+        </p>
+      </div>
+      <button
+        type="button"
+        className="botao-redondo player__mais-rapido"
+        aria-label={t.player.maisRapido}
+        title={t.player.maisRapido}
+        onClick={() => mudarVelocidade(1)}
+      >
+        <Icone nome="maisRapido" tamanho={22} />
       </button>
       <input
         className="player__deslize"
@@ -92,14 +110,8 @@ export function PlayerDeVoz({ texto, idiomaDaFala }: { texto: string; idiomaDaFa
       >
         <Icone nome={preferencias.lerSozinho ? 'som' : 'mudo'} tamanho={20} />
       </button>
-      <button
-        type="button"
-        className="botao-redondo player__parar"
-        aria-label={t.player.parar}
-        disabled={leitura.estado === 'parado'}
-        onClick={leitura.parar}
-      >
-        <Icone nome="parar" tamanho={18} />
+      <button type="button" className="player__principal" aria-label={rotuloPrincipal} onClick={aoApertar}>
+        <Icone nome={lendo ? 'pausar' : 'tocar'} tamanho={24} />
       </button>
     </section>
   )

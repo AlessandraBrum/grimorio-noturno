@@ -2,11 +2,14 @@ import type { Ponto } from './contorno'
 
 const LARGURA_DA_CARTA = 700
 const ALTURA_DA_CARTA = Math.round((LARGURA_DA_CARTA * 88) / 63)
-const NOME: Regiao = { busca: { x0: 0.03, x1: 0.97, y0: 0.015, y1: 0.17 }, colunas: { x0: 0.06, x1: 0.7 } }
+const NOME: Regiao = { busca: { x0: 0.03, x1: 0.995, y0: 0.015, y1: 0.17 }, colunas: { x0: 0.06, x1: 0.7 } }
 const TIPO: Regiao = { busca: { x0: 0.03, x1: 0.97, y0: 0.535, y1: 0.615 }, colunas: { x0: 0.07, x1: 0.62 } }
 const FORCA: Regiao = { busca: { x0: 0.74, x1: 0.97, y0: 0.86, y1: 0.97 }, colunas: { x0: 0.78, x1: 0.93 } }
-const SIMBOLOS = { x0: 0.45, x1: 0.955 }
-const VAO_ENTRE_SIMBOLOS = 0.45
+const SIMBOLOS = { x0: 0.45, x1: 0.985 }
+const VAO_ENTRE_SIMBOLOS = 0.6
+const SUAVIZACAO = 0.1
+const CONTRASTE_MINIMO = 2
+const LARGURA_DE_UM_SIMBOLO = 0.3
 const SIMBOLO_MINIMO = 0.45
 const PASSO_DO_SIMBOLO = 1.1
 const ALTURA_DA_LINHA = 0.042
@@ -294,7 +297,12 @@ function ampliar(claro: Uint8ClampedArray, w: number, h: number, escala: number)
   return saida
 }
 
-export function contarSimbolos(quadro: Quadro, cantos: Ponto[]) {
+export interface Custo {
+  quantidade: number
+  seguro: boolean
+}
+
+export function lerCusto(quadro: Quadro, cantos: Ponto[]): Custo {
   const { cinza, w, h } = amostrar(quadro, cantos, NOME.busca)
   const { topo, altura } = linhaMaisProvavel(cinza, w, h, NOME)
   const largura = NOME.busca.x1 - NOME.busca.x0
@@ -311,28 +319,42 @@ export function contarSimbolos(quadro: Quadro, cantos: Ponto[]) {
     }
     energia[x - x0] = soma / (y1 - y0)
   }
+  const raio = Math.max(1, Math.round(altura * SUAVIZACAO))
+  const suave = new Float32Array(energia.length)
+  for (let x = 0; x < energia.length; x++) {
+    let soma = 0
+    let n = 0
+    for (let k = Math.max(0, x - raio); k <= Math.min(energia.length - 1, x + raio); k++) {
+      soma += energia[k]
+      n++
+    }
+    suave[x] = soma / n
+  }
+  energia.set(suave)
   const ordenada = [...energia].sort((a, b) => a - b)
   const fundo = ordenada[Math.floor(ordenada.length * 0.3)]
   const pico = ordenada[Math.floor(ordenada.length * 0.95)]
-  if (pico - fundo < 6) return 0
+  if (pico - fundo < CONTRASTE_MINIMO) return { quantidade: 0, seguro: false }
   const limiar = fundo + (pico - fundo) * 0.35
-  const vao = altura * VAO_ENTRE_SIMBOLOS
-  let fim = -1
-  let inicio = -1
-  let ultimo = -1
-  for (let x = energia.length - 1; x >= 0; x--) {
-    if (energia[x] < limiar) {
-      if (fim >= 0 && ultimo - x > vao) break
-      continue
+  const trechos: [number, number][] = []
+  let comeco = -1
+  for (let x = 0; x <= energia.length; x++) {
+    const cheio = x < energia.length && energia[x] >= limiar
+    if (cheio && comeco < 0) comeco = x
+    if (!cheio && comeco >= 0) {
+      trechos.push([comeco, x - 1])
+      comeco = -1
     }
-    if (fim < 0) fim = x
-    inicio = x
-    ultimo = x
   }
-  if (fim < 0) return 0
-  const extensao = fim - inicio + 1
-  if (extensao < altura * SIMBOLO_MINIMO) return 0
-  return Math.max(1, Math.round(extensao / (altura * PASSO_DO_SIMBOLO)))
+  if (!trechos.length) return { quantidade: 0, seguro: false }
+  const vao = altura * VAO_ENTRE_SIMBOLOS
+  const grupo = [trechos[trechos.length - 1]]
+  for (let i = trechos.length - 2; i >= 0 && grupo[grupo.length - 1][0] - trechos[i][1] <= vao; i--) grupo.push(trechos[i])
+  const extensao = grupo[0][1] - grupo[grupo.length - 1][0] + 1
+  if (extensao < altura * SIMBOLO_MINIMO) return { quantidade: 0, seguro: false }
+  const pelaExtensao = Math.max(1, Math.round(extensao / (altura * PASSO_DO_SIMBOLO)))
+  const separados = grupo.filter(([inicio, fim]) => fim - inicio + 1 >= altura * LARGURA_DE_UM_SIMBOLO).length
+  return { quantidade: Math.max(pelaExtensao, separados), seguro: pelaExtensao === separados }
 }
 
 export function recortarNome(quadro: Quadro, cantos: Ponto[], modo: 'tinta' | 'cinza' = 'tinta', parte: ParteDaCarta = 'nome') {

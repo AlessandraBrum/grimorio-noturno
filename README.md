@@ -76,7 +76,7 @@ Depois, procura o retângulo da carta na imagem, endireita a foto e tenta ler o 
 
 A leitura do nome usa o Tesseract.js, que roda dentro do aparelho. Ele é preparado só com os modelos de português e inglês, lê uma linha de cada vez e ignora os caracteres que não aparecem em nomes de cartas. Os modelos e o motor ficam dentro do próprio app, então não é preciso baixar nada de fora na primeira leitura.
 
-O texto lido é comparado com o catálogo de nomes de cartas, tolerando letras trocadas, nomes cortados e pedaços do nome. Quando a leitura fica na dúvida entre nomes parecidos, o app desempata nesta ordem: lê a linha de tipo (criatura, feitiço, mágica instantânea, terreno...), conta os símbolos do custo de mana no canto do nome e, em criaturas, lê o poder e a resistência. Depois compara com a base de tipos e custos. A arte não entra na decisão, porque muda entre edições, cartas foil e artes personalizadas.
+O texto lido é comparado com o catálogo de nomes de cartas, tolerando letras trocadas, nomes cortados e pedaços do nome. Um nome só é aceito junto com o custo de mana: o app conta os símbolos no canto do nome e confere com a quantidade da carta. Quando a contagem fica duvidosa, só aceita nomes lidos quase sem erro. Se ainda houver nomes parecidos, desempata pela linha de tipo (criatura, feitiço, mágica instantânea, terreno...) e, em criaturas, pelo poder e pela resistência. Depois compara com a base de tipos e custos. A arte não entra na decisão, porque muda entre edições, cartas foil e artes personalizadas.
 
 Quando a leitura não fecha, o app dá uma dica: aproximar a carta ou endireitar, com vibração e um aviso sonoro curto. Se continuar em dúvida, mostra até três candidatos e pede confirmação antes de abrir a ficha.
 

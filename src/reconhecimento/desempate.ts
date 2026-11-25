@@ -1,16 +1,20 @@
+import type { Custo } from './barraDoNome'
 import { chaveDoNome } from './catalogo'
 
 export interface Sinais {
   tipos: string
-  simbolos: number | null
   forca: string
 }
 
-interface Ficha {
+export interface Ficha {
   tipos: string
-  simbolos: number
+  custo: string
   forca: string
 }
+
+export type Fichas = Map<string, Ficha>
+
+const NOME_FORTE = 0.9
 
 const PALAVRAS_DE_TIPO: [string, string][] = [
   ['creature', 'C'], ['criatura', 'C'], ['sorcery', 'S'], ['feitico', 'S'], ['instant', 'I'], ['instantanea', 'I'],
@@ -29,8 +33,8 @@ export function carregarFichas() {
     .then(({ faces }) => {
       const mapa = new Map<string, Ficha>()
       for (const [nome, resumo] of Object.entries(faces)) {
-        const [tipos, simbolos, forca] = resumo.split('|')
-        mapa.set(nome, { tipos, simbolos: Number(simbolos), forca })
+        const [tipos, custo, forca] = resumo.split('|')
+        mapa.set(nome, { tipos, custo, forca })
       }
       return mapa
     })
@@ -81,16 +85,18 @@ function forcaBate(lida: string, certa: string) {
   return false
 }
 
+export function custoConfere(nome: string, pontuacao: number, custo: Custo | null, fichas: Fichas | null) {
+  const ficha = fichas?.get(nome)
+  if (!custo || !ficha) return true
+  if (custo.seguro) return custo.quantidade === ficha.custo.length
+  return pontuacao >= NOME_FORTE
+}
+
 function tipoBate(sinais: Sinais, ficha: Ficha) {
   return !!ficha.tipos && [...sinais.tipos].every((letra) => ficha.tipos.includes(letra))
 }
 
-function custoBate(sinais: Sinais, ficha: Ficha) {
-  if (!sinais.simbolos) return sinais.tipos.includes('L') ? ficha.simbolos === 0 : null
-  return sinais.simbolos === ficha.simbolos
-}
-
-function filtrar(nomes: string[], mapa: Map<string, Ficha>, teste: (ficha: Ficha) => boolean | null) {
+function filtrar(nomes: string[], mapa: Fichas, teste: (ficha: Ficha) => boolean | null) {
   const restantes = nomes.filter((nome) => {
     const ficha = mapa.get(nome)
     return !ficha || teste(ficha) !== false
@@ -98,25 +104,13 @@ function filtrar(nomes: string[], mapa: Map<string, Ficha>, teste: (ficha: Ficha
   return restantes.length ? restantes : nomes
 }
 
-export function desempatar(nomes: string[], sinais: Sinais, mapa: Map<string, Ficha>) {
-  if (!sinais.tipos) return null
-  const contra = (nome: string) => {
-    const ficha = mapa.get(nome)
-    if (!ficha) return true
-    return !tipoBate(sinais, ficha) || custoBate(sinais, ficha) === false
-  }
-  const aFavor = (nome: string) => {
-    const ficha = mapa.get(nome)
-    if (!ficha) return false
-    return tipoBate(sinais, ficha)
-  }
-  if (nomes.length === 1) return aFavor(nomes[0]) && !contra(nomes[0]) ? nomes[0] : null
+export function desempatar(nomes: string[], sinais: Sinais, mapa: Fichas) {
+  if (!sinais.tipos || nomes.length < 2) return null
   let restantes = filtrar(nomes, mapa, (ficha) => tipoBate(sinais, ficha))
-  if (restantes.length > 1) restantes = filtrar(restantes, mapa, (ficha) => custoBate(sinais, ficha))
   if (restantes.length > 1) {
     restantes = filtrar(restantes, mapa, (ficha) => (ficha.forca ? forcaBate(sinais.forca, ficha.forca) : sinais.forca && digitos(sinais.forca).length >= 2 ? false : null))
   }
   if (restantes.length !== 1 || restantes.length === nomes.length) return null
-  const [escolhido] = restantes
-  return contra(escolhido) ? null : escolhido
+  const ficha = mapa.get(restantes[0])
+  return ficha && tipoBate(sinais, ficha) ? restantes[0] : null
 }

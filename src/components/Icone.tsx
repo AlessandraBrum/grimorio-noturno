@@ -14,6 +14,8 @@ const CAMINHOS = {
   fechar: <path d="M6 6l12 12M18 6L6 18" />,
   esquerda: <path d="M15 6l-6 6 6 6" />,
   direita: <path d="M9 6l6 6-6 6" />,
+  maisLento: <path d="M18 6l-6 6 6 6M11 6l-6 6 6 6" />,
+  maisRapido: <path d="M6 6l6 6-6 6M13 6l6 6-6 6" />,
   baixo: <path d="M6 9l6 6 6-6" />,
   cima: <><path d="M12 19V5" /><path d="M5 12l7-7 7 7" /></>,
   check: <path d="M5 12l5 5 9-10" />,
@@ -22,7 +24,6 @@ const CAMINHOS = {
 const PREENCHIDOS = {
   tocar: <path d="M8 5v14l11-7z" />,
   pausar: <path d="M7 5h4v14H7zM13 5h4v14h-4z" />,
-  parar: <path d="M6 6h12v12H6z" />,
   lua: <path d="M15 3a9 9 0 1 0 6 15.6A7.5 7.5 0 0 1 15 3z" />,
   estrela: <path d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z" />,
 }

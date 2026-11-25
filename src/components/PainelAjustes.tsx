@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { usePreferencias, type Tema } from '../contexto/usePreferencias'
 import type { Idioma } from '../types/card'
 import { Icone } from './Icone'
+import { InstalarApp } from './InstalarApp'
 import { Interruptor } from './Interruptor'
 import { Opcoes } from './Opcoes'
 
@@ -41,6 +42,8 @@ export function PainelAjustes({ aoFechar }: { aoFechar: () => void }) {
         </div>
 
         <div className="gaveta__corpo">
+          <InstalarApp destaque />
+
           <Opcoes<Idioma>
             legenda={t.ajustesPainel.idioma}
             nome="idioma"

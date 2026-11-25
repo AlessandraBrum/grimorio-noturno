@@ -23,8 +23,15 @@ function codigoDosTipos(linha = '') {
   return [...new Set(TIPOS.filter(([palavra]) => tipos.includes(palavra)).map(([, letra]) => letra))].join('')
 }
 
+function simbolo(texto) {
+  if (/^(\d+|X|Y|Z)$/.test(texto)) return 'N'
+  if (/^[WUBRGC]$/.test(texto)) return texto
+  if (/^[WUBRG]\/P$/.test(texto)) return texto[0]
+  return 'H'
+}
+
 function simbolos(custo = '') {
-  return (custo.match(/\{[^}]+\}/g) ?? []).length
+  return (custo.match(/\{[^}]+\}/g) ?? []).map((parte) => simbolo(parte.slice(1, -1))).join('')
 }
 
 function resumo(face) {

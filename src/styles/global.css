@@ -896,10 +896,6 @@ body::before {
     background: color-mix(in srgb, var(--vinho) 75%, #000);
   }
 
-  .player__velocidade:hover {
-    background: var(--veu-alto);
-  }
-
   .player__som[aria-pressed="true"]:hover {
     background: color-mix(in srgb, var(--vinho) 75%, #000);
     color: var(--sobre-vinho);
@@ -934,11 +930,11 @@ body::before {
 
 .carta__player .player {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
   grid-template-areas:
-    "botao estado som parar"
-    "botao velocidade som parar"
-    "deslize deslize deslize deslize";
+    "menos painel mais som botao"
+    "deslize deslize deslize deslize deslize";
+  align-items: center;
   column-gap: var(--espaco-3);
   row-gap: 2px;
   padding: 8px 12px;
@@ -952,8 +948,16 @@ body::before {
   height: 56px;
 }
 
-.carta__player .player__estado {
-  grid-area: estado;
+.carta__player .player__painel {
+  grid-area: painel;
+}
+
+.carta__player .player__mais-lento {
+  grid-area: menos;
+}
+
+.carta__player .player__mais-rapido {
+  grid-area: mais;
 }
 
 .carta__player .player__deslize {
@@ -963,14 +967,7 @@ body::before {
 }
 
 .carta__player .player__velocidade {
-  grid-area: velocidade;
-  justify-self: start;
   font-size: 0.9375rem;
-}
-
-
-.carta__player .player > .player__parar {
-  grid-area: parar;
 }
 
 .carta__player .player > .player__som {
@@ -1139,25 +1136,26 @@ body::before {
   cursor: pointer;
 }
 
+.player__painel {
+  min-width: 0;
+  text-align: center;
+}
+
 .player__estado {
+  margin: 0;
   font-weight: 800;
 }
 
 .player__velocidade {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--espaco-2);
-  min-height: 44px;
-  padding: 0 var(--espaco-3);
-  border: 2px solid var(--rosa);
-  border-radius: var(--raio-pilula);
-  background: transparent;
-  color: var(--tinta);
-  font: inherit;
+  margin: 0;
   font-weight: 600;
   white-space: nowrap;
-  cursor: pointer;
+}
+
+.player__mais-lento,
+.player__mais-rapido {
+  flex: none;
+  border: 2px solid var(--rosa);
 }
 
 .player__velocidade strong {
@@ -1951,4 +1949,16 @@ body::before {
 
 .ajuda__contato:hover {
   color: var(--sobre-vinho);
+}
+
+.instalar {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--espaco-2);
+}
+
+.instalar__passos {
+  margin: 0;
+  font-weight: 600;
 }
