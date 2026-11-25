@@ -1,5 +1,5 @@
 const SITE = 'Grimório Noturno'
-const REMETENTE = 'envio@lunasoftwares.com'
+const REMETENTE = 'contato@envio.lunasoftwares.com'
 const DESTINO = 'ambuxedev@gmail.com'
 const ASSUNTOS = {
   sugestao: 'Sugestões de melhorias',
