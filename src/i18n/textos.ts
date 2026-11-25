@@ -8,7 +8,8 @@ const pt = {
     botao: 'Instalar o Grimório',
     passosApple: 'No iPhone ou iPad: toque em Compartilhar e depois em “Adicionar à Tela de Início”.',
     passosNavegador: 'Abra o menu do navegador (os três pontinhos ⋮) e escolha “Instalar app” ou “Adicionar à tela inicial”. No computador, também dá para usar o ícone de instalar na barra de endereço.',
-    desinstalou: 'Se você já instalou e removeu o app, é só instalar de novo por aqui.',
+    passosAndroid: 'Se a instalação não aparecer, o Grimório abre no Chrome. Lá, toque de novo em “Instalar o Grimório”.',
+    desinstalou: 'Se você tirou o ícone da tela inicial e a instalação não aparece, o app ainda está no celular. Veja na lista de apps ou em Configurações > Apps > Grimório. Se quiser instalar de novo, desinstale por lá antes.',
   },
   navegacao: 'Principal',
   abas: {
@@ -242,7 +243,8 @@ const en: Textos = {
     botao: 'Install Grimório',
     passosApple: 'On iPhone or iPad: tap Share, then “Add to Home Screen”.',
     passosNavegador: 'Open the browser menu (the three dots ⋮) and choose “Install app” or “Add to Home screen”. On a computer, you can also use the install icon in the address bar.',
-    desinstalou: 'If you installed and removed the app, just install it again here.',
+    passosAndroid: 'If the install prompt does not show up, Grimório opens in Chrome. There, tap “Install Grimório” again.',
+    desinstalou: 'If you removed the icon from the home screen and the install prompt does not show up, the app is still on your phone. Check your app list or Settings > Apps > Grimório. To install it again, uninstall it there first.',
   },
   navegacao: 'Main',
   abas: {

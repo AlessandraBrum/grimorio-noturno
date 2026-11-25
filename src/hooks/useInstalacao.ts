@@ -34,6 +34,15 @@ function ehAparelhoApple() {
   return /iphone|ipad|ipod/i.test(navigator.userAgent) || iPadNovo
 }
 
+function ehAndroid() {
+  return /android/i.test(navigator.userAgent)
+}
+
+function abrirNoChrome() {
+  const { host, pathname, search, href } = window.location
+  window.location.href = `intent://${host}${pathname}${search}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(href)};end`
+}
+
 export function useInstalacao() {
   const [, atualizar] = useState(0)
 
@@ -60,6 +69,8 @@ export function useInstalacao() {
     instalado,
     podeInstalar: !instalado && !!pedidoGuardado,
     aparelhoApple: ehAparelhoApple(),
+    android: ehAndroid(),
+    abrirNoChrome,
     instalar,
   }
 }
