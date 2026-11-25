@@ -1388,6 +1388,19 @@ body::before {
   box-shadow: var(--brilho);
 }
 
+.sobre-suite {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-3);
+  padding: var(--espaco-3) var(--espaco-4);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-pilula);
+  background: var(--veu-alto);
+  line-height: 1.4;
+}
+.sobre-suite svg { flex: none; color: var(--lua); }
+.sobre-suite a { color: var(--tinta); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+
 .rodape {
   border-top: 1px solid var(--borda);
   padding-block: var(--espaco-5) 130px;

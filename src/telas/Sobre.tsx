@@ -1,10 +1,12 @@
 import { useState } from 'react'
+import { Icone } from '../components/Icone'
 import { NomeDoJogo } from '../components/NomeDoJogo'
 import { FimDeSecao } from '../components/SetaTopo'
 import { usePreferencias } from '../contexto/usePreferencias'
 
 const PORTFOLIO = 'https://alessandrabrum.com/'
 const LUNA_SOFTWARES = 'https://lunasoftwares.com/'
+const SUITE_LUNA = 'https://www.lunasoftwares.com/'
 
 const LINKS_DA_AUTORA = [
   { chave: 'portfolio', href: 'https://links.alessandrabrum.com/' },
@@ -37,6 +39,15 @@ export function Sobre() {
         </h1>
       </div>
 
+      <section className="sobre-suite" aria-label={s.luna}>
+        <Icone nome="lua" tamanho={26} />
+        <p>
+          {s.suiteAntes}
+          <LinkExterno href={SUITE_LUNA} texto={s.suiteLink} aviso={s.novaAba} />
+          {s.suiteDepois}
+        </p>
+      </section>
+
       <section className="cartao" aria-labelledby="sobre-app">
         <h2 id="sobre-app" className="titulo-secao">{s.oQueE}</h2>
         <p><NomeDoJogo texto={s.oQueETexto} /></p>
@@ -56,19 +67,6 @@ export function Sobre() {
           <a href="#contato">{s.aparelhosTestes.link}</a>
           {s.aparelhosTestes.depois}
         </p>
-      </section>
-
-      <section className="cartao" aria-labelledby="sobre-luna">
-        <h2 id="sobre-luna" className="titulo-secao">{s.luna}</h2>
-        <p>{s.lunaTexto}</p>
-        <ul className="lista-links">
-          <li>
-            <LinkExterno href="https://magicluna.alessandrabrum.com/" texto="Magic Luna" aviso={s.novaAba} />
-          </li>
-          <li>
-            <span className="texto-apoio">{s.lunaLinktree}</span>
-          </li>
-        </ul>
       </section>
       <FimDeSecao />
 

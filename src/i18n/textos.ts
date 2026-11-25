@@ -170,6 +170,9 @@ const pt = {
     luna: 'Luna Softwares',
     lunaTexto: 'O Grimório Noturno faz parte do Luna Softwares, uma suíte de apps independentes, acessíveis e gratuitos, como o Magic Luna.',
     lunaLinktree: 'Linktree do Luna Softwares (em breve)',
+    suiteAntes: 'O Grimório Noturno faz parte da ',
+    suiteLink: 'suíte Luna Softwares',
+    suiteDepois: '.',
     privacidade: 'Privacidade e dados (LGPD)',
     privacidadeItens: [
       'Não há cadastro, login, anúncios, analytics nem cookies de rastreio.',
@@ -390,6 +393,9 @@ const en: Textos = {
     luna: 'Luna Softwares',
     lunaTexto: 'Grimório Noturno is part of Luna Softwares, a suite of independent, accessible and free apps, like Magic Luna.',
     lunaLinktree: 'Luna Softwares Linktree (coming soon)',
+    suiteAntes: 'Grimório Noturno is part of the ',
+    suiteLink: 'Luna Softwares suite',
+    suiteDepois: '.',
     privacidade: 'Privacy and data (LGPD)',
     privacidadeItens: [
       'No sign-up, login, ads, analytics or tracking cookies.',
