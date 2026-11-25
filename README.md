@@ -54,7 +54,7 @@ O app não pede cadastro e não usa anúncios nem rastreio. Suas preferências e
 | Web Worker | Tira a comparação das artes da tela principal, para o app não travar enquanto procura |
 | Impressão digital da arte | Compara o desenho da carta com uma base de mais de 34 mil artes para confirmar o nome |
 | API do Scryfall | Consulta nomes, textos, imagens e o catálogo de nomes das cartas |
-| Basin | Recebe as mensagens do formulário de contato |
+| Resend | Entrega por e-mail as mensagens do formulário de contato |
 | Vercel | Hospeda o site e a função que envia o formulário |
 
 ### Como o app conversa com o Scryfall
