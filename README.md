@@ -105,12 +105,13 @@ incluem uma captura quando houver. A captura só é transmitida ao enviar.
 
 ### Ativar o envio na Vercel
 
-1. [Verifique um domínio de envio no Resend](https://resend.com/docs/dashboard/domains/introduction).
-2. [Crie uma chave de API no Resend](https://resend.com/api-keys) com permissão de envio.
+1. [Crie um formulário no Basin](https://docs.usebasin.com/getting-started/quickstart/).
+2. Em **Emails**, configure `ambuxedev@gmail.com` para receber as
+   notificações e confirme o endereço pelo e-mail do Basin.
 3. Na Vercel, em **Settings → Environment Variables**, adicione
-   `RESEND_API_KEY` com essa chave e `CONTATO_EMAIL_REMETENTE` com um endereço
-   do domínio verificado. Selecione Production ou Preview conforme o ambiente
-   onde vai testar. Guarde a chave apenas no servidor.
+   `CONTATO_BASIN_URL` com a URL da aba **Setup** do formulário
+   (no formato `https://usebasin.com/f/ID`). Selecione Production ou Preview
+   conforme o ambiente onde vai testar.
 4. Faça um novo deploy para a Vercel carregar as variáveis. O Vite sozinho
    renderiza a página local, e a função `/api/contato` roda na Vercel.
 5. Abra o formulário no deploy e envie uma mensagem com duas imagens.
@@ -124,8 +125,8 @@ seleções. Imagens maiores são reduzidas no dispositivo para caber em 3 MB por
 anexo. Se o navegador não conseguir abrir o formato, exporte a foto como JPEG
 ou PNG e tente novamente. Se uma
 parte falhar, o botão **Continuar envio** retoma das partes ainda sem confirmação
-enquanto a página estiver aberta. O Resend aplica suas próprias cotas de envio.
+enquanto a página estiver aberta. Cada parte conta como um envio no Basin, que inclui links das imagens nas notificações.
 
-A rota aceita apenas envios da origem do site e encaminha para o destinatário
-fixo. Contra spam, há um campo oculto e um limite de 60 partes a cada 10
+A rota aceita apenas envios da origem do site e encaminha para o formulário
+configurado no Basin. Contra spam, há um campo oculto e um limite de 60 partes a cada 10
 minutos por IP em cada instância da função.

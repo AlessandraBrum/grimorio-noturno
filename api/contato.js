@@ -1,6 +1,3 @@
-
-const DESTINO = 'ambuxedev@gmail.com'
-
 const ASSUNTOS = {
   sugestao: 'Sugestões de melhorias',
   erro: 'Reportar erro',
@@ -43,9 +40,8 @@ export default {
 
     const tamanho = Number(request.headers.get('content-length'))
     if (!Number.isSafeInteger(tamanho) || tamanho <= 0 || tamanho > LIMITE_REQUISICAO) return json(413)
-    const chave = process.env.RESEND_API_KEY?.trim()
-    const remetente = process.env.CONTATO_EMAIL_REMETENTE?.trim()
-    if (!chave || !remetente) return json(503)
+    const endpoint = process.env.CONTATO_BASIN_URL?.trim()
+    if (!endpoint || !/^https:\/\/usebasin\.com\/f\/[a-z\d]+$/i.test(endpoint)) return json(503)
 
     const ip = (request.headers.get('x-forwarded-for') ?? '').split(',')[0].trim() || 'desconhecido'
     if (passouDoLimite(ip)) return json(429)
@@ -86,33 +82,22 @@ export default {
       return json(400)
     }
 
-    const referencia = id.slice(0, 8)
-    const detalhes = [
-      `Protocolo: ${id}`,
-      `Parte: ${parte} de ${total}`,
-      `Resposta por ${canal === 'email' ? 'e-mail' : 'WhatsApp'}: ${resposta}`,
-      origem && `Origem: ${origem}`,
-    ].filter(Boolean).join('\n')
+    const envio = new FormData()
+    envio.set('assunto', ASSUNTOS[assunto])
+    envio.set('protocolo', id)
+    envio.set('parte', `${parte} de ${total}`)
+    envio.set('mensagem', mensagem ?? 'Imagem em anexo.')
+    envio.set(canal === 'email' ? 'email' : 'whatsapp', resposta)
+    if (origem) envio.set('origem', origem)
+    if (imagem) envio.set('imagem', imagem, nomeSeguro(imagem.name) || 'imagem')
+
     try {
-      const resultado = await fetch('https://api.resend.com/emails', {
+      const resultado = await fetch(endpoint, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${chave}`,
-          'Content-Type': 'application/json',
-          'Idempotency-Key': `grimorio-noturno/${id}/${parte}`,
-        },
+        headers: { Accept: 'application/json', Origin: new URL(request.url).origin },
+        redirect: 'error',
         signal: AbortSignal.timeout(25_000),
-        body: JSON.stringify({
-          from: `Grimório Noturno <${remetente}>`,
-          to: [DESTINO],
-          reply_to: canal === 'email' ? resposta : undefined,
-          subject: `[Grimório ${referencia}] ${ASSUNTOS[assunto]} (${parte}/${total})`,
-          text: `${detalhes}\n\n${mensagem ?? 'Imagem em anexo.'}`,
-          attachments: imagem ? [{
-            filename: nomeSeguro(imagem.name) || 'imagem',
-            content: Buffer.from(await imagem.arrayBuffer()).toString('base64'),
-          }] : undefined,
-        }),
+        body: envio,
       })
       if (!resultado.ok) return json(502)
       return json(200, { enviado: true })
