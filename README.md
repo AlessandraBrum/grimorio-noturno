@@ -12,7 +12,7 @@ Faz parte do Luna Softwares.
 - Para quem tem daltonismo: as cores de mana sempre aparecem também escritas, então não é preciso reconhecer a cor.
 - Para quem tem dislexia: fonte feita para facilitar a leitura e espaçamento ajustável.
 - Para quem está começando e ainda não conhece os termos do jogo.
-- Para quem joga em loja ou evento, com pouco tempo e internet fraca: as cartas já vistas abrem mesmo sem internet.
+- Para quem quer ver a tradução de uma carta.
 
 ## O que dá para fazer
 
@@ -24,8 +24,6 @@ Faz parte do Luna Softwares.
 - Desligar as animações. Se o celular ou o computador estiver com "reduzir movimento" ligado, elas já ficam desligadas.
 - Usar o app todo pelo teclado.
 - Trocar o idioma do app entre português e inglês.
-
-Em breve: buscar a carta falando o nome e apontando a câmera.
 
 ## Privacidade
 
