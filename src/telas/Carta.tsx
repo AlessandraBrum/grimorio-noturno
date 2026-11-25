@@ -21,8 +21,10 @@ export function Carta({ carta, aoReportar }: { carta: Card; aoReportar: () => vo
   const termos = termosDaCarta(carta.keywords)
   const simbolos = carta.manaCost.match(/\{[^}]+\}/g)?.map((s) => s.slice(1, -1)) ?? []
   const langDaCarta = emPortugues ? 'pt-BR' : 'en'
+  const langDoNome = carta.printedName ? langDaCarta : 'en'
 
   const textoParaLer = [
+    carta.adaptada ? textosDaCarta.adaptada : '',
     nome,
     tipo,
     `${textosDaCarta.custo}: ${custoEmPalavras(carta.manaCost, carta.lang)}`,
@@ -41,7 +43,7 @@ export function Carta({ carta, aoReportar }: { carta: Card; aoReportar: () => vo
 
       <div className="carta">
         <div className="carta__cabeca">
-          <h1 id="titulo-tela" tabIndex={-1} className="carta__nome" lang={langDaCarta}>
+          <h1 id="titulo-tela" tabIndex={-1} className="carta__nome" lang={langDoNome}>
             {nome}
           </h1>
           <p className="texto-apoio" lang={langDaCarta}>
@@ -65,6 +67,12 @@ export function Carta({ carta, aoReportar }: { carta: Card; aoReportar: () => vo
             <p className="aviso" role="note">
               <Icone nome="lua" tamanho={20} />
               <span>{t.carta.emIngles}</span>
+            </p>
+          )}
+          {idioma === 'pt' && carta.adaptada && (
+            <p className="aviso" role="note">
+              <Icone nome="lua" tamanho={20} />
+              <span>{t.carta.adaptada}</span>
             </p>
           )}
 

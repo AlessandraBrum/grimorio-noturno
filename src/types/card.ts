@@ -2,6 +2,7 @@ export type Idioma = 'pt' | 'en'
 
 export interface Card {
   id: string
+  oracleId?: string
   name: string
   lang: Idioma
   printedName?: string
@@ -17,4 +18,5 @@ export interface Card {
   setName: string
   rarity: string
   imageUrl?: string
+  adaptada?: boolean
 }

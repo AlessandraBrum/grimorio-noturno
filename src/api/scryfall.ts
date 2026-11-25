@@ -69,6 +69,7 @@ async function pedir<T>(caminho: string, sinal?: AbortSignal): Promise<T> {
 
 interface CartaScryfall {
   id: string
+  oracle_id?: string
   name: string
   lang: string
   printed_name?: string
@@ -88,6 +89,7 @@ interface CartaScryfall {
     name: string
     type_line?: string
     mana_cost?: string
+    oracle_id?: string
     oracle_text?: string
     printed_name?: string
     printed_type_line?: string
@@ -106,6 +108,7 @@ function converter(dados: CartaScryfall): Card {
   const face = dados.card_faces?.[0]
   return {
     id: dados.id,
+    oracleId: dados.oracle_id ?? face?.oracle_id,
     name: dados.name,
     lang: dados.lang === 'pt' ? 'pt' : 'en',
     printedName: dados.printed_name ?? face?.printed_name,
@@ -159,12 +162,28 @@ export async function buscarCarta(nome: string, idioma: Idioma): Promise<Card> {
   try {
     const dadosLocalizados = await buscarNomeExato(original.name, idioma)
     const localizada = dadosLocalizados ? converter(dadosLocalizados) : undefined
-    const resultado = localizada ?? emIngles
+    const resultado = localizada ?? (idioma === 'pt' ? await adaptarParaPortugues(emIngles) : emIngles)
     cartasPorIdioma.set(chave, resultado)
     return resultado
   } catch {
     return emIngles
   }
+}
+
+const traducoes = new Map<string, Promise<Record<string, Array<{ t: string; x: string }>>>>()
+
+async function adaptarParaPortugues(carta: Card): Promise<Card> {
+  if (!carta.oracleId) return carta
+  const grupo = carta.oracleId.slice(0, 2)
+  if (!traducoes.has(grupo)) {
+    traducoes.set(grupo, fetch(`/traducoes/${grupo}.json`).then((resposta) => (resposta.ok ? resposta.json() : {})).catch(() => {
+      traducoes.delete(grupo)
+      return {}
+    }))
+  }
+  const face = (await traducoes.get(grupo)!)[carta.oracleId]?.[0]
+  if (!face) return carta
+  return { ...carta, lang: 'pt', printedTypeLine: face.t || undefined, printedText: face.x || undefined, adaptada: true }
 }
 
 async function buscarNomeExato(nome: string, idioma: Idioma): Promise<CartaScryfall | undefined> {
