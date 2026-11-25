@@ -56,6 +56,9 @@ export default {
     const armadilha = dados.get('site')
     if (typeof armadilha === 'string' && armadilha.trim()) return json(200, { enviado: true })
 
+    const nome = dados.get('nome')
+    if (nome !== null && (typeof nome !== 'string' || !nome.trim() || nome.length > 120)) return json(400)
+
     const assunto = dados.get('assunto')
     const canal = dados.get('canal')
     const resposta = dados.get('resposta')
@@ -83,6 +86,7 @@ export default {
     }
 
     const envio = new FormData()
+    if (nome) envio.set('nome', nome.trim())
     envio.set('assunto', ASSUNTOS[assunto])
     envio.set('protocolo', id)
     envio.set('parte', `${parte} de ${total}`)

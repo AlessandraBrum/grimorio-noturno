@@ -14,7 +14,7 @@ const EMAIL_PUBLICO = 'ambuxedev@gmail.com'
 const TELEFONE = /^\+[1-9]\d{7,14}$/
 const EMAIL = /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/
 
-type Campo = 'assunto' | 'mensagem' | 'resposta'
+type Campo = 'nome' | 'assunto' | 'mensagem' | 'resposta'
 
 export function Contato({ contexto }: { contexto?: ContextoContato }) {
   const { t, preferencias } = usePreferencias()
@@ -69,16 +69,18 @@ export function Contato({ contexto }: { contexto?: ContextoContato }) {
 
     if (!fila.current) {
       const dados = new FormData(formulario)
+      const nome = String(dados.get('nome') ?? '').trim()
       const resposta = String(dados.get('resposta') ?? '').trim()
       const numero = resposta.replace(/[\s().-]/g, '')
       const mensagem = String(dados.get('mensagem') ?? '').trim()
       const encontrados: Partial<Record<Campo, string>> = {}
+      if (!nome) encontrados.nome = c.faltaNome
       if (!assunto) encontrados.assunto = c.faltaAssunto
       if (!mensagem) encontrados.mensagem = c.faltaMensagem
       if (canal === 'email' && !EMAIL.test(resposta)) encontrados.resposta = c.faltaEmail
       if (canal === 'whatsapp' && !TELEFONE.test(numero)) encontrados.resposta = c.telefoneInvalido
       setErros(encontrados)
-      const primeiro = (['assunto', 'mensagem', 'resposta'] as const).find((campo) => encontrados[campo])
+      const primeiro = (['nome', 'assunto', 'mensagem', 'resposta'] as const).find((campo) => encontrados[campo])
       if (primeiro || !assunto) {
         if (primeiro) document.getElementById(`contato-${primeiro}`)?.focus()
         return
@@ -88,6 +90,7 @@ export function Contato({ contexto }: { contexto?: ContextoContato }) {
       const total = textos.length + imagens.length
       const partes = [...textos, ...imagens].map((conteudo, indice) => {
         const parte = new FormData()
+        parte.set('nome', nome)
         parte.set('assunto', assunto)
         parte.set('canal', canal)
         parte.set('resposta', canal === 'whatsapp' ? numero : resposta)
@@ -147,6 +150,14 @@ export function Contato({ contexto }: { contexto?: ContextoContato }) {
         <p>{c.obrigatorios}</p>
         {contexto && <p>{c.origem}: {contexto.origem}</p>}
         <fieldset className="contato__campos" disabled={enviando || parcial}>
+          <label className="campo">
+            <span className="campo__rotulo">{c.nome}</span>
+            <input id="contato-nome" className="campo__entrada" type="text" name="nome" autoComplete="name" maxLength={120} required
+              aria-invalid={erros.nome ? true : undefined} aria-describedby={descricao(erros.nome && 'contato-nome-erro')}
+              onChange={() => limparErro('nome')} />
+            {erros.nome && <span id="contato-nome-erro" className="contato__erro">{erros.nome}</span>}
+          </label>
+
           <Seletor<Assunto>
             id="contato-assunto"
             rotulo={c.assunto}

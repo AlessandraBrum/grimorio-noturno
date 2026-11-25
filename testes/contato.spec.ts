@@ -28,6 +28,7 @@ test('envia texto longo e várias imagens, retomando após falha parcial', async
   await page.route('**/api/contato', async (rota) => {
     const pedido = rota.request().postDataBuffer()!.toString()
     expect(pedido).toContain('contato@example.com')
+    expect(pedido).toContain('Pessoa de Teste')
     const parte = Number(pedido.match(/name="parte"\r\n\r\n(\d+)/)?.[1])
     partes.push(parte)
     if (partes.length === 2) return rota.fulfill({ status: 502 })
@@ -36,6 +37,9 @@ test('envia texto longo e várias imagens, retomando após falha parcial', async
   await page.goto('/#contato')
   await page.getByRole('combobox', { name: /Assunto/ }).click()
   await page.getByRole('option', { name: 'Reportar erro', exact: true }).click()
+  await page.getByRole('button', { name: 'Enviar mensagem' }).click()
+  await expect(page.getByRole('textbox', { name: /Nome/ })).toBeFocused()
+  await page.getByRole('textbox', { name: /Nome/ }).fill('Pessoa de Teste')
   await page.getByLabel('Mensagem').fill('a'.repeat(50_001))
   await page.getByRole('textbox', { name: 'E-mail' }).fill('contato@example.com')
   const imagens = page.getByLabel('Imagens (opcional)')

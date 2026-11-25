@@ -5,6 +5,7 @@ export type Assunto = (typeof ASSUNTOS)[number]
 export const CONTATO = {
   pt: {
     intro: 'Envie sua mensagem para Alessandra. Você também pode escrever diretamente por e-mail.',
+    nome: 'Nome', faltaNome: 'Informe seu nome.',
     assunto: 'Assunto', escolher: 'Escolha um assunto', mensagem: 'Mensagem',
     canal: 'Como você prefere receber a resposta?', email: 'E-mail', whatsapp: 'WhatsApp',
     numero: 'Número do WhatsApp', ddd: 'Inclua o código do país e o DDD, por exemplo +55 11 91234-5678.',
@@ -33,6 +34,7 @@ export const CONTATO = {
   },
   en: {
     intro: 'Send Alessandra a message. You can also write to her directly by email.',
+    nome: 'Name', faltaNome: 'Enter your name.',
     assunto: 'Subject', escolher: 'Choose a subject', mensagem: 'Message',
     canal: 'How would you like to receive a reply?', email: 'Email', whatsapp: 'WhatsApp',
     numero: 'WhatsApp number', ddd: 'Include your country and area code, for example +1 415 555 0123.',
