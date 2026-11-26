@@ -1,4 +1,5 @@
 const pt = {
+  tituloPagina: 'Grimório Noturno: cartas de Magic: The Gathering lidas em voz alta',
   pularParaBusca: 'Pular para a busca',
   assinatura: 'por Luna Softwares',
   abrirAjustes: 'Abrir ajustes',
@@ -234,6 +235,7 @@ const pt = {
 export type Textos = typeof pt
 
 const en: Textos = {
+  tituloPagina: 'Grimório Noturno: Magic: The Gathering cards read out loud',
   pularParaBusca: 'Skip to search',
   assinatura: 'by Luna Softwares',
   abrirAjustes: 'Open settings',

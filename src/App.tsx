@@ -49,7 +49,7 @@ export function App() {
 
   useEffect(() => {
     const titulo = telaVisivel === 'carta' && carta ? carta.printedName ?? carta.name : t.abas[telaVisivel as keyof typeof t.abas]
-    document.title = `${titulo} · Grimório Noturno`
+    document.title = telaVisivel === 'buscar' ? t.tituloPagina : `${titulo} · Grimório Noturno`
     if (primeiraTela.current) {
       primeiraTela.current = false
       return
