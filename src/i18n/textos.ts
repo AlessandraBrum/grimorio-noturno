@@ -164,7 +164,7 @@ const pt = {
   sobre: {
     titulo: 'Sobre',
     oQueE: 'O que é o Grimório Noturno',
-    oQueETexto: 'Um app gratuito para entender cartas de Magic: The Gathering na mesa de jogo, feito para quem tem baixa visão, daltonismo ou dislexia, e para quem não quer perder tempo digitando.',
+    oQueETexto: 'Um app gratuito para entender cartas de Magic: The Gathering, feito para quem é cego, tem baixa visão, daltonismo, dislexia, ou simplesmente está começando ou não fala inglês como primeira língua. Por ser um web app, funciona com o tradutor automático do seu navegador.',
     aparelhos: 'Funciona em quais aparelhos',
     aparelhosTexto: 'O app abre em qualquer navegador atual, no celular ou no computador. Algumas funções dependem do aparelho:',
     aparelhosItens: [
@@ -400,7 +400,7 @@ const en: Textos = {
   sobre: {
     titulo: 'About',
     oQueE: 'What Grimório Noturno is',
-    oQueETexto: 'A free app to understand Magic: The Gathering cards at the table, made for people with low vision, color blindness or dyslexia, and for anyone who doesn’t want to waste time typing.',
+    oQueETexto: 'A free app to understand Magic: The Gathering cards, made for players who are blind, have low vision, color blindness, dyslexia, or are simply beginners or non-native English speakers. Since it’s a web app, it works with your browser’s automatic translator.',
     aparelhos: 'Which devices it works on',
     aparelhosTexto: 'The app opens in any current browser, on a phone or a computer. Some features depend on the device:',
     aparelhosItens: [
